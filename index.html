@@ -674,68 +674,6 @@ body.bgm-playing .bgm-chip { border-color: var(--sakura); color: var(--sakura); 
   border-color: var(--sakura);
 }
 
-/* ── AI 速报 ───────────────────────────────────────────── */
-
-.news-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
-  gap: 16px;
-}
-
-.news-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: clamp(18px, 2.6vw, 24px);
-  color: inherit;
-  text-decoration: none;
-  transition: transform 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
-}
-
-.news-card:hover {
-  transform: translateY(-5px);
-  border-color: var(--sakura);
-  box-shadow: var(--shadow);
-}
-
-.news-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 0.74rem;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-}
-
-.news-source {
-  color: var(--gold);
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.news-card strong {
-  font-family: "Noto Serif SC", serif;
-  font-size: 1.04rem;
-  line-height: 1.55;
-  font-weight: 700;
-}
-
-.news-card p {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: 0.88rem;
-  line-height: 1.7;
-}
-
-.news-loading,
-.news-empty {
-  color: var(--ink-faint);
-  font-size: 0.9rem;
-  letter-spacing: 0.2em;
-  padding: 24px 0;
-}
-
 .project-glyph {
   display: grid;
   place-items: center;
@@ -1870,7 +1808,6 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
       <nav class="site-nav" id="siteNav" aria-label="主导航">
         <a href="#intro"><i aria-hidden="true">▸</i>序章</a>
         <a href="#projects"><i aria-hidden="true">▸</i>项目</a>
-        <a href="#ainews"><i aria-hidden="true">▸</i>速报</a>
         <a href="#friends"><i aria-hidden="true">▸</i>友链</a>
         <a href="#contact"><i aria-hidden="true">▸</i>联络</a>
         <button class="bgm-chip" id="bgmToggle" type="button" aria-expanded="false" aria-controls="bgmDrawer">
@@ -2006,23 +1943,10 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
         </div>
       </section>
 
-      <!-- ── 第二章 · AI 速报 ── -->
-      <section class="chapter" id="ainews">
-        <header class="chapter-head" data-reveal>
-          <p class="chapter-no">第二章 · CHAPTER II</p>
-          <h2>AI 速报</h2>
-          <p class="chapter-lead">每天清晨，吾替你把 AI 圈的风声收拢到这里。<span id="newsUpdated"></span></p>
-        </header>
-
-        <div class="news-list" id="newsList" aria-live="polite">
-          <p class="news-loading">电波调整中……</p>
-        </div>
-      </section>
-
-      <!-- ── 第三章 · 友链 ── -->
+      <!-- ── 第二章 · 友链 ── -->
       <section class="chapter" id="friends">
         <header class="chapter-head" data-reveal>
-          <p class="chapter-no">第三章 · CHAPTER III</p>
+          <p class="chapter-no">第二章 · CHAPTER II</p>
           <h2>友情链接</h2>
           <p class="chapter-lead">来过这里的人，都会在书页边留一枚藏书票。</p>
         </header>
@@ -2036,10 +1960,10 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
         </div>
       </section>
 
-      <!-- ── 第四章 · 联络 ── -->
+      <!-- ── 第三章 · 联络 ── -->
       <section class="chapter" id="contact">
         <header class="chapter-head" data-reveal>
-          <p class="chapter-no">第四章 · CHAPTER IV</p>
+          <p class="chapter-no">第三章 · CHAPTER III</p>
           <h2>找到我</h2>
           <p class="chapter-lead">深夜在线率最高，白天随缘回复。</p>
         </header>
@@ -2701,56 +2625,6 @@ if (visitorCount) {
   refresh();
   // 每 60 秒刷新一次，避免徽章长时间显示过期状态
   window.setInterval(refresh, 60000);
-})();
-
-/* ── AI 速报 ─────────────────────────────────────────────── */
-
-(function aiNews() {
-  const list = document.getElementById("newsList");
-  const updatedEl = document.getElementById("newsUpdated");
-  if (!list) return;
-
-  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  }[c]));
-
-  fetch("ai-news.json", { cache: "no-store" })
-    .then((r) => {
-      if (!r.ok) throw new Error(`status ${r.status}`);
-      return r.json();
-    })
-    .then((data) => {
-      const items = Array.isArray(data.items) ? data.items.slice(0, 12) : [];
-      if (!items.length) {
-        list.innerHTML = '<p class="news-empty">今日份电波尚未抵达……</p>';
-        return;
-      }
-      list.innerHTML = "";
-      items.forEach((item, i) => {
-        const a = document.createElement("a");
-        a.className = "paper-card news-card";
-        a.href = item.url;
-        a.target = "_blank";
-        a.rel = "noreferrer";
-        a.style.transitionDelay = `${i * 0.06}s`;
-        a.innerHTML =
-          `<span class="news-meta"><span class="news-source">${esc(item.source || "AI 前线")}</span>` +
-          `<span>${esc(item.date || "")}</span></span>` +
-          `<strong>${esc(item.title)}</strong>` +
-          (item.summary ? `<p>${esc(item.summary)}</p>` : "");
-        list.appendChild(a);
-        observeReveal(a);
-      });
-      if (data.updated && updatedEl) {
-        const d = new Date(data.updated);
-        if (!Number.isNaN(d.getTime())) {
-          updatedEl.textContent = `（更新于 ${d.getMonth() + 1} 月 ${d.getDate()} 日）`;
-        }
-      }
-    })
-    .catch(() => {
-      list.innerHTML = '<p class="news-empty">电波中断，稍后再来……</p>';
-    });
 })();
 
 /* ── QQ 复制 ──────────────────────────────────────────── */
