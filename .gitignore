@@ -2,3 +2,9 @@
 *.log
 .venv
 __pycache__/
+*.pyc
+.env
+*.env
+!.env.example
+server/**/state.json
+server/**/friends.json

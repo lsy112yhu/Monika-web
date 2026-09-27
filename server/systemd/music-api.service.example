@@ -1,0 +1,25 @@
+[Unit]
+Description=Monika-web music API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/monika-web/server/music
+Environment=NODE_OPTIONS=--max-old-space-size=128
+EnvironmentFile=/etc/monika-web/music-api.env
+ExecStart=/usr/bin/node /opt/monika-web/server/music/server.js
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/monika-web
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

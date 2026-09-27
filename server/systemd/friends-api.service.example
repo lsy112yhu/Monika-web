@@ -1,0 +1,21 @@
+[Unit]
+Description=Monika-web friend links API
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/monika-web/server/friends
+EnvironmentFile=/etc/monika-web/friends-api.env
+ExecStart=/usr/bin/python3 /opt/monika-web/server/friends/friends_api.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/monika-web
+
+[Install]
+WantedBy=multi-user.target

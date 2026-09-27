@@ -1,0 +1,14 @@
+{
+  "name": "web-lsy2005-music-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Private QQ Music playlist adapter for web.lsy2005.xyz",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
