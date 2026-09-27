@@ -389,7 +389,7 @@ body.bgm-playing .bgm-chip { border-color: var(--sakura); color: var(--sakura); 
 
 .hero {
   position: relative;
-  max-width: 1120px;
+  max-width: min(1480px, 94vw);
   margin: 0 auto;
   padding: clamp(48px, 9vh, 110px) clamp(18px, 4vw, 46px) clamp(30px, 5vh, 60px);
   display: flex;
@@ -399,8 +399,8 @@ body.bgm-playing .bgm-chip { border-color: var(--sakura); color: var(--sakura); 
 
 .hero-stage {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr);
-  gap: clamp(28px, 4vw, 60px);
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 420px);
+  gap: clamp(28px, 4vw, 68px);
   align-items: center;
 }
 
@@ -551,7 +551,7 @@ body.bgm-playing .bgm-chip { border-color: var(--sakura); color: var(--sakura); 
 
 .dialogue {
   position: relative;
-  max-width: 780px;
+  max-width: min(920px, 100%);
   width: 100%;
   margin: 0 auto;
   padding: 22px 28px 20px;
@@ -618,7 +618,7 @@ body.bgm-playing .bgm-chip { border-color: var(--sakura); color: var(--sakura); 
 /* ── 章节 ─────────────────────────────────────────────── */
 
 .chapter {
-  max-width: 1120px;
+  max-width: min(1480px, 94vw);
   margin: 0 auto;
   padding: clamp(44px, 8vh, 90px) clamp(18px, 4vw, 46px) 0;
 }
@@ -659,7 +659,11 @@ body.bgm-playing .bgm-chip { border-color: var(--sakura); color: var(--sakura); 
 
 /* ── 项目列表 ─────────────────────────────────────────── */
 
-.project-list { display: flex; flex-direction: column; gap: 16px; }
+.project-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 20px;
+}
 
 .project-row {
   display: grid;
@@ -913,7 +917,7 @@ body.bgm-playing .bgm-chip { border-color: var(--sakura); color: var(--sakura); 
 .site-footer {
   position: relative;
   z-index: 2;
-  max-width: 1120px;
+  max-width: min(1480px, 94vw);
   margin: 0 auto;
   padding: clamp(50px, 9vh, 100px) clamp(18px, 4vw, 46px) 46px;
   text-align: center;
@@ -1851,7 +1855,7 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
 
 .scene-change {
   position: relative;
-  max-width: 1120px;
+  max-width: min(1480px, 94vw);
   margin: clamp(30px, 6vh, 58px) auto 0;
   padding: 0 clamp(18px, 4vw, 46px);
   overflow: hidden;
@@ -2074,8 +2078,13 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
 .mascot-bubble.is-show { opacity: 1; visibility: visible; }
 .mascot-bubble.is-dragging { cursor: grabbing; }
 @media (max-width: 640px) {
-  .mascot { width: 108px; right: 8px; bottom: 8px; }
-  .mascot-bubble { font-size: 0.8rem; }
+  .mascot { width: 88px; right: 8px; bottom: 8px; }
+  .mascot-bubble {
+    font-size: 0.78rem;
+    max-width: min(190px, 58vw);
+    padding: 8px 11px;
+    line-height: 1.55;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3838,8 +3847,8 @@ musicSavePublished?.addEventListener("click", async () => {
   ];
   let timer = 0;
   let last = -1;
-  const POS_KEY = "monika-mascot-pos";
-  let bubbleShift = { x: -18, y: -78 };
+  let bubbleShift = { x: -20, y: -78 };
+  let bubbleCustom = false;
   let dragged = false;
 
   function clamp(value, min, max) {
@@ -3848,7 +3857,7 @@ musicSavePublished?.addEventListener("click", async () => {
   function placeMascot(x, y) {
     const rect = mascot.getBoundingClientRect();
     const left = clamp(x, 4, window.innerWidth - rect.width - 4);
-    const top = clamp(y, 4, window.innerHeight - Math.min(rect.height, 80) - 4);
+    const top = clamp(y, 4, window.innerHeight - rect.height - 4);
     mascot.style.left = `${left}px`;
     mascot.style.top = `${top}px`;
     mascot.style.right = "auto";
@@ -3856,23 +3865,20 @@ musicSavePublished?.addEventListener("click", async () => {
   }
   function placeBubble() {
     const host = mascot.getBoundingClientRect();
-    bubble.style.left = `${host.left + bubbleShift.x}px`;
-    bubble.style.top = `${host.top + bubbleShift.y}px`;
-    const box = bubble.getBoundingClientRect();
-    const left = clamp(box.left, 8, window.innerWidth - box.width - 8);
-    const top = clamp(box.top, 8, window.innerHeight - box.height - 8);
+    const bw = bubble.offsetWidth || 190;
+    const bh = bubble.offsetHeight || 64;
+    if (!bubbleCustom) {
+      // 默认初始位置：紧凑贴在看板娘左上方，不越过视口边缘
+      const left = clamp(host.right - bw - 10, 8, window.innerWidth - bw - 8);
+      const top = clamp(host.top - bh - 8, 8, window.innerHeight - bh - 8);
+      bubble.style.left = `${left}px`;
+      bubble.style.top = `${top}px`;
+      return;
+    }
+    const left = clamp(host.left + bubbleShift.x, 8, window.innerWidth - bw - 8);
+    const top = clamp(host.top + bubbleShift.y, 8, window.innerHeight - bh - 8);
     bubble.style.left = `${left}px`;
     bubble.style.top = `${top}px`;
-  }
-  function savePos() {
-    const box = mascot.getBoundingClientRect();
-    const bubbleBox = bubble.getBoundingClientRect();
-    localStorage.setItem(POS_KEY, JSON.stringify({
-      x: box.left,
-      y: box.top,
-      bubbleX: bubbleBox.left - box.left,
-      bubbleY: bubbleBox.top - box.top,
-    }));
   }
   function speak(text, hold = 3600) {
     bubble.textContent = text;
@@ -3922,7 +3928,7 @@ musicSavePublished?.addEventListener("click", async () => {
       if (!active) return;
       active = false;
       target.classList.remove("is-dragging");
-      if (dragged) onDrop();
+      if (dragged && onDrop) onDrop();
     }
     target.addEventListener("pointerdown", start);
     target.addEventListener("pointermove", move);
@@ -3933,13 +3939,14 @@ musicSavePublished?.addEventListener("click", async () => {
   bindDrag(mascot, (x, y) => {
     placeMascot(x, y);
     if (bubble.classList.contains("is-show")) placeBubble();
-  }, savePos);
+  });
   bindDrag(bubble, (x, y) => {
     const host = mascot.getBoundingClientRect();
+    bubbleCustom = true;
     bubbleShift = { x: x - host.left, y: y - host.top };
     bubble.style.left = `${x}px`;
     bubble.style.top = `${y}px`;
-  }, savePos);
+  });
   mascot.addEventListener("click", () => { if (!dragged) poke(); });
   mascot.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -3947,18 +3954,11 @@ musicSavePublished?.addEventListener("click", async () => {
       poke();
     }
   });
-  try {
-    const saved = JSON.parse(localStorage.getItem(POS_KEY) || "null");
-    if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
-      placeMascot(saved.x, saved.y);
-      if (Number.isFinite(saved.bubbleX) && Number.isFinite(saved.bubbleY)) {
-        bubbleShift = { x: saved.bubbleX, y: saved.bubbleY };
-      }
-    }
-  } catch {}
   window.addEventListener("resize", () => {
-    const box = mascot.getBoundingClientRect();
-    if (mascot.style.left) placeMascot(box.left, box.top);
+    if (mascot.style.left) {
+      const box = mascot.getBoundingClientRect();
+      placeMascot(box.left, box.top);
+    }
     if (bubble.classList.contains("is-show")) placeBubble();
   });
   window.setTimeout(() => speak("欢迎来到深夜文学部，我是 Monika，请多指教！", 4800), 2600);
