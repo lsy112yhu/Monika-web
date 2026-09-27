@@ -2230,6 +2230,35 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
   }
 }
 
+/* ── 20260927 移动端浮层边界修正 ───────────────────── */
+@media (max-width: 900px) {
+  html,
+  body {
+    overflow-x: clip;
+  }
+
+  .mascot {
+    position: fixed !important;
+    inset-inline-start: auto !important;
+    inset-inline-end: max(10px, env(safe-area-inset-right, 10px)) !important;
+    bottom: max(24px, env(safe-area-inset-bottom, 24px)) !important;
+    width: 56px !important;
+    max-width: calc(100vw - 20px);
+  }
+
+  .mascot-img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+  }
+
+  .mascot-bubble {
+    right: 0;
+    max-width: min(150px, calc(100vw - 84px));
+  }
+}
+
 </style>
     <noscript><style>.site-loader { display: none; }</style></noscript>
     <script>
