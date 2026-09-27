@@ -1666,8 +1666,20 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
 /* ── 响应式 ───────────────────────────────────────────── */
 
 @media (max-width: 900px) {
-  .hero-stage { grid-template-columns: 1fr; }
-  .hero-status { max-width: 460px; }
+  .hero {
+    padding: 28px 18px 18px;
+    gap: 16px;
+  }
+  .hero-stage { grid-template-columns: 1fr; gap: 16px; }
+  .hero-eyebrow { margin-bottom: 10px; letter-spacing: 0.28em; }
+  .hero-title-main { font-size: clamp(2.15rem, 11vw, 3rem); }
+  .hero-sub { margin-top: 12px; }
+  .hero-actions { margin-top: 16px; }
+  .hero-status { max-width: none; padding: 16px 16px 14px; }
+  .hero-status-kicker { margin-bottom: 8px; }
+  .hero-status-list { gap: 0; }
+  .hero-status-list > div { padding: 7px 0; }
+  .dialogue { margin-top: 2px; }
 }
 
 @media (max-width: 720px) {
@@ -2016,11 +2028,11 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
   bottom: 16px;
   z-index: 60;
   width: 148px;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
   -webkit-tap-highlight-color: transparent;
-  transition: transform 0.25s ease;
 }
-.mascot:hover { transform: scale(1.06); }
+.mascot.is-dragging { cursor: grabbing; }
 .mascot:focus-visible { outline: 2px solid var(--sakura); outline-offset: 4px; border-radius: 12px; }
 .mascot-img {
   display: block;
@@ -2031,6 +2043,7 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
   transform-origin: 50% 92%;
   transition: filter 0.6s ease;
   user-select: none;
+  pointer-events: none;
 }
 @keyframes mascotFloat {
   0%, 100% { transform: translateY(0) rotate(-0.8deg); }
@@ -2038,12 +2051,11 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
 }
 [data-era="day"] .mascot-img { filter: drop-shadow(0 10px 18px rgba(96, 64, 40, 0.35)); }
 .mascot-bubble {
-  position: absolute;
+  position: fixed;
+  z-index: 61;
   left: 0;
-  right: auto;
-  bottom: calc(100% - 8px);
-  min-width: 150px;
-  max-width: min(225px, 46vw);
+  top: 0;
+  width: min(225px, 68vw);
   padding: 10px 14px;
   font-family: "Noto Serif SC", serif;
   font-size: 0.86rem;
@@ -2051,53 +2063,19 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
   color: var(--ink);
   background: var(--dialogue-bg);
   border: 1px solid var(--paper-edge);
-  border-radius: 12px 12px 4px 12px;
+  border-radius: 12px;
   box-shadow: var(--shadow);
   opacity: 0;
-  transform: translateY(8px) scale(0.96);
-  transform-origin: bottom right;
-  transition: opacity 0.28s ease, transform 0.28s ease;
-  pointer-events: none;
+  visibility: hidden;
+  cursor: grab;
+  touch-action: none;
+  transition: opacity 0.28s ease, visibility 0.28s ease;
 }
-.mascot-bubble.is-show { opacity: 1; transform: none; }
-.mascot-bubble::after {
-  content: "";
-  position: absolute;
-  left: 28px;
-  bottom: -7px;
-  width: 12px;
-  height: 12px;
-  background: var(--dialogue-bg);
-  border-right: 1px solid var(--paper-edge);
-  border-bottom: 1px solid var(--paper-edge);
-  transform: rotate(45deg);
-}
+.mascot-bubble.is-show { opacity: 1; visibility: visible; }
+.mascot-bubble.is-dragging { cursor: grabbing; }
 @media (max-width: 640px) {
-  .mascot {
-    width: 76px;
-    right: 6px;
-    bottom: 0;
-    height: 118px;
-    overflow: visible;
-  }
-  .mascot-img {
-    height: 118px;
-    width: 76px;
-    object-fit: cover;
-    object-position: center top;
-    margin-top: 0;
-  }
-  .mascot-bubble {
-    left: auto;
-    right: 0;
-    bottom: calc(100% + 6px);
-    max-width: min(210px, 62vw);
-    font-size: 0.8rem;
-    transform-origin: bottom right;
-    visibility: hidden;
-  }
-  .mascot-bubble.is-show { visibility: visible; }
-  .mascot-bubble::after { left: auto; right: 22px; }
+  .mascot { width: 108px; right: 8px; bottom: 8px; }
+  .mascot-bubble { font-size: 0.8rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2161,10 +2139,10 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
     <div class="backdrop-vignette" aria-hidden="true"></div>
 
     <!-- ── 看板娘立绘 ── -->
-    <div class="mascot" id="mascot" role="button" tabindex="0" aria-label="看板娘 Monika，点击有话说">
-      <div class="mascot-bubble" id="mascotBubble" aria-hidden="true"></div>
+    <div class="mascot" id="mascot" role="button" tabindex="0" aria-label="看板娘 Monika，拖动可挪开，点击有话说">
       <img class="mascot-img" src="assets/monika-chibi-blink.webp" alt="" draggable="false">
     </div>
+    <div class="mascot-bubble" id="mascotBubble" aria-hidden="true"></div>
 
     <!-- ── 页眉 ── -->
     <header class="site-header" id="siteHeader">
@@ -3860,9 +3838,46 @@ musicSavePublished?.addEventListener("click", async () => {
   ];
   let timer = 0;
   let last = -1;
+  const POS_KEY = "monika-mascot-pos";
+  let bubbleShift = { x: -18, y: -78 };
+  let dragged = false;
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+  function placeMascot(x, y) {
+    const rect = mascot.getBoundingClientRect();
+    const left = clamp(x, 4, window.innerWidth - rect.width - 4);
+    const top = clamp(y, 4, window.innerHeight - Math.min(rect.height, 80) - 4);
+    mascot.style.left = `${left}px`;
+    mascot.style.top = `${top}px`;
+    mascot.style.right = "auto";
+    mascot.style.bottom = "auto";
+  }
+  function placeBubble() {
+    const host = mascot.getBoundingClientRect();
+    bubble.style.left = `${host.left + bubbleShift.x}px`;
+    bubble.style.top = `${host.top + bubbleShift.y}px`;
+    const box = bubble.getBoundingClientRect();
+    const left = clamp(box.left, 8, window.innerWidth - box.width - 8);
+    const top = clamp(box.top, 8, window.innerHeight - box.height - 8);
+    bubble.style.left = `${left}px`;
+    bubble.style.top = `${top}px`;
+  }
+  function savePos() {
+    const box = mascot.getBoundingClientRect();
+    const bubbleBox = bubble.getBoundingClientRect();
+    localStorage.setItem(POS_KEY, JSON.stringify({
+      x: box.left,
+      y: box.top,
+      bubbleX: bubbleBox.left - box.left,
+      bubbleY: bubbleBox.top - box.top,
+    }));
+  }
   function speak(text, hold = 3600) {
     bubble.textContent = text;
     bubble.classList.add("is-show");
+    placeBubble();
     window.clearTimeout(timer);
     timer = window.setTimeout(() => bubble.classList.remove("is-show"), hold);
   }
@@ -3871,25 +3886,81 @@ musicSavePublished?.addEventListener("click", async () => {
     do { i = Math.floor(Math.random() * lines.length); } while (i === last);
     last = i;
     speak(lines[i]);
-    if (!prefersReducedMotion) {
-      mascot.animate(
-        [
-          { transform: "scale(1)" },
-          { transform: "scale(1.08) rotate(-2deg)" },
-          { transform: "scale(1)" },
-        ],
-        { duration: 420, easing: "ease-out" }
-      );
-    }
   }
-  mascot.addEventListener("click", poke);
+  function bindDrag(target, onMove, onDrop) {
+    let startX = 0;
+    let startY = 0;
+    let originX = 0;
+    let originY = 0;
+    let active = false;
+    function point(event) {
+      const touch = event.touches ? event.touches[0] : event;
+      return { x: touch.clientX, y: touch.clientY };
+    }
+    function start(event) {
+      if (event.button != null && event.button !== 0) return;
+      const p = point(event);
+      const box = target.getBoundingClientRect();
+      startX = p.x;
+      startY = p.y;
+      originX = box.left;
+      originY = box.top;
+      active = true;
+      dragged = false;
+      target.classList.add("is-dragging");
+      target.setPointerCapture?.(event.pointerId);
+    }
+    function move(event) {
+      if (!active) return;
+      const p = point(event);
+      if (Math.hypot(p.x - startX, p.y - startY) > 6) dragged = true;
+      if (!dragged) return;
+      event.preventDefault();
+      onMove(originX + p.x - startX, originY + p.y - startY);
+    }
+    function end() {
+      if (!active) return;
+      active = false;
+      target.classList.remove("is-dragging");
+      if (dragged) onDrop();
+    }
+    target.addEventListener("pointerdown", start);
+    target.addEventListener("pointermove", move);
+    target.addEventListener("pointerup", end);
+    target.addEventListener("pointercancel", end);
+  }
+
+  bindDrag(mascot, (x, y) => {
+    placeMascot(x, y);
+    if (bubble.classList.contains("is-show")) placeBubble();
+  }, savePos);
+  bindDrag(bubble, (x, y) => {
+    const host = mascot.getBoundingClientRect();
+    bubbleShift = { x: x - host.left, y: y - host.top };
+    bubble.style.left = `${x}px`;
+    bubble.style.top = `${y}px`;
+  }, savePos);
+  mascot.addEventListener("click", () => { if (!dragged) poke(); });
   mascot.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       poke();
     }
   });
-  // 初见打招呼
+  try {
+    const saved = JSON.parse(localStorage.getItem(POS_KEY) || "null");
+    if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+      placeMascot(saved.x, saved.y);
+      if (Number.isFinite(saved.bubbleX) && Number.isFinite(saved.bubbleY)) {
+        bubbleShift = { x: saved.bubbleX, y: saved.bubbleY };
+      }
+    }
+  } catch {}
+  window.addEventListener("resize", () => {
+    const box = mascot.getBoundingClientRect();
+    if (mascot.style.left) placeMascot(box.left, box.top);
+    if (bubble.classList.contains("is-show")) placeBubble();
+  });
   window.setTimeout(() => speak("欢迎来到深夜文学部，我是 Monika，请多指教！", 4800), 2600);
 })();
 
