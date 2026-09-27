@@ -6,7 +6,7 @@
     <title>Monika Nexus · 深夜文学部</title>
     <meta
       name="description"
-      content="Monika 的个人入口页 —— 深夜文学部。收纳自建生图站、图床、API 中转站、Bot 控制台与联系方式。"
+      content="Monika 的个人入口页 —— 深夜文学部。收纳 API 中转站、AstrBot 控制台与联系方式。"
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -2039,10 +2039,11 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
 [data-era="day"] .mascot-img { filter: drop-shadow(0 10px 18px rgba(96, 64, 40, 0.35)); }
 .mascot-bubble {
   position: absolute;
-  right: 76%;
-  bottom: 74%;
+  left: 0;
+  right: auto;
+  bottom: calc(100% - 8px);
   min-width: 150px;
-  max-width: 225px;
+  max-width: min(225px, 46vw);
   padding: 10px 14px;
   font-family: "Noto Serif SC", serif;
   font-size: 0.86rem;
@@ -2062,18 +2063,41 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
 .mascot-bubble::after {
   content: "";
   position: absolute;
-  right: -7px;
-  bottom: 20px;
+  left: 28px;
+  bottom: -7px;
   width: 12px;
   height: 12px;
   background: var(--dialogue-bg);
   border-right: 1px solid var(--paper-edge);
   border-bottom: 1px solid var(--paper-edge);
-  transform: rotate(-45deg);
+  transform: rotate(45deg);
 }
 @media (max-width: 640px) {
-  .mascot { width: 92px; right: 10px; bottom: 10px; }
-  .mascot-bubble { right: 68%; font-size: 0.8rem; }
+  .mascot {
+    width: 76px;
+    right: 6px;
+    bottom: 0;
+    height: 118px;
+    overflow: visible;
+  }
+  .mascot-img {
+    height: 118px;
+    width: 76px;
+    object-fit: cover;
+    object-position: center top;
+    margin-top: 0;
+  }
+  .mascot-bubble {
+    left: auto;
+    right: 0;
+    bottom: calc(100% + 6px);
+    max-width: min(210px, 62vw);
+    font-size: 0.8rem;
+    transform-origin: bottom right;
+    visibility: hidden;
+  }
+  .mascot-bubble.is-show { visibility: visible; }
+  .mascot-bubble::after { left: auto; right: 22px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2190,7 +2214,7 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
             </h1>
             <p class="hero-sub">
               ACGN 爱好者 / 夜猫子 / 生图炼丹师。<br />
-              这里收纳自建的生图站、图床、API 中转与两只 Bot。
+              这里收纳 API 中转站，以及 AstrBot 控制台。
             </p>
             <div class="hero-actions">
               <a class="btn-choice" href="#projects"><i aria-hidden="true">▶</i>翻开项目</a>
@@ -2223,36 +2247,10 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
         <header class="chapter-head" data-reveal>
           <p class="chapter-no">第一章 · CHAPTER I</p>
           <h2>项目入口</h2>
-          <p class="chapter-lead">五个常驻的自建服务，状态由服务器每半分钟探测一次。</p>
+          <p class="chapter-lead">两处常驻入口，状态由服务器每半分钟探测一次。</p>
         </header>
 
         <div class="project-list">
-          <a class="project-row paper-card" data-reveal data-ping="https://image.lsy2005.xyz/" href="https://image.lsy2005.xyz/" target="_blank" rel="noreferrer">
-            <span class="project-cg" aria-hidden="true"><span class="cg-tag">CG</span><span class="project-glyph">絵</span><span class="cg-shine"></span></span>
-            <span class="project-copy">
-              <span class="project-kicker">IMAGE GEN</span>
-              <strong>生图站</strong>
-              <p>日常炼丹、出图、试模型的主战场。灵感起雾的时候来这里捞画面。</p>
-            </span>
-            <span class="project-side">
-              <span class="status-badge" data-state="probing"><i class="status-dot" aria-hidden="true"></i><span class="status-text">探测中</span></span>
-              <span class="project-go" aria-hidden="true">进入 ▸</span>
-            </span>
-          </a>
-
-          <a class="project-row paper-card" data-reveal data-ping="https://img.lsy2005.xyz/" href="https://img.lsy2005.xyz/" target="_blank" rel="noreferrer">
-            <span class="project-cg" aria-hidden="true"><span class="cg-tag">CG</span><span class="project-glyph">庫</span><span class="cg-shine"></span></span>
-            <span class="project-copy">
-              <span class="project-kicker">IMAGE HOST</span>
-              <strong>图床</strong>
-              <p>截图、素材和网页图片统一收纳，需要外链时从这里取用。</p>
-            </span>
-            <span class="project-side">
-              <span class="status-badge" data-state="probing"><i class="status-dot" aria-hidden="true"></i><span class="status-text">探测中</span></span>
-              <span class="project-go" aria-hidden="true">进入 ▸</span>
-            </span>
-          </a>
-
           <a class="project-row paper-card" data-reveal data-ping="https://api.lsy2005.xyz/" href="https://api.lsy2005.xyz/" target="_blank" rel="noreferrer">
             <span class="project-cg" aria-hidden="true"><span class="cg-tag">CG</span><span class="project-glyph">継</span><span class="cg-shine"></span></span>
             <span class="project-copy">
@@ -2272,19 +2270,6 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
               <span class="project-kicker">ASTRBOT</span>
               <strong>QQBot 控制台</strong>
               <p>看状态、调插件、处理 QQBot 日常的小入口。深夜挂机守护它别掉线。</p>
-            </span>
-            <span class="project-side">
-              <span class="status-badge" data-state="probing"><i class="status-dot" aria-hidden="true"></i><span class="status-text">探测中</span></span>
-              <span class="project-go" aria-hidden="true">进入 ▸</span>
-            </span>
-          </a>
-
-          <a class="project-row paper-card" data-reveal data-ping="https://xhh.lsy2005.xyz/" href="https://xhh.lsy2005.xyz/" target="_blank" rel="noreferrer">
-            <span class="project-cg" aria-hidden="true"><span class="cg-tag">CG</span><span class="project-glyph">盒</span><span class="cg-shine"></span></span>
-            <span class="project-copy">
-              <span class="project-kicker">XIAOHEIHE BOT</span>
-              <strong>小黑盒 Bot 控制台</strong>
-              <p>查看评论机器人运行状态、队列与日志，处理小黑盒 Bot 的日常维护。</p>
             </span>
             <span class="project-side">
               <span class="status-badge" data-state="probing"><i class="status-dot" aria-hidden="true"></i><span class="status-text">探测中</span></span>
@@ -2883,7 +2868,7 @@ if (eraToggle && eraMenu) {
   const lines = [
     greeting,
     "我是 Monika —— ACGN 爱好者、夜猫子、生图炼丹师。",
-    "这个站点收纳了我的五个自建服务：生图站、图床、API 中转，还有两只 Bot。",
+    "现在入口只留两处：API 中转站，还有 AstrBot 控制台。",
     "往下翻是项目入口；喜欢的话，也可以在友链区留一枚藏书票。",
     "对了，右上角的 BGM 按钮可以放点音乐……就当是社团活动室的背景声。",
   ];
