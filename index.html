@@ -2009,6 +2009,73 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
 
 /* ── 动效偏好 ─────────────────────────────────────────── */
 
+/* ── 看板娘立绘 ─────────────────────────────── */
+.mascot {
+  position: fixed;
+  right: 22px;
+  bottom: 16px;
+  z-index: 60;
+  width: 148px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.25s ease;
+}
+.mascot:hover { transform: scale(1.06); }
+.mascot:focus-visible { outline: 2px solid var(--sakura); outline-offset: 4px; border-radius: 12px; }
+.mascot-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
+  animation: mascotFloat 5.2s ease-in-out infinite;
+  transform-origin: 50% 92%;
+  transition: filter 0.6s ease;
+  user-select: none;
+}
+@keyframes mascotFloat {
+  0%, 100% { transform: translateY(0) rotate(-0.8deg); }
+  50% { transform: translateY(-11px) rotate(0.8deg); }
+}
+[data-era="day"] .mascot-img { filter: drop-shadow(0 10px 18px rgba(96, 64, 40, 0.35)); }
+.mascot-bubble {
+  position: absolute;
+  right: 76%;
+  bottom: 74%;
+  min-width: 150px;
+  max-width: 225px;
+  padding: 10px 14px;
+  font-family: "Noto Serif SC", serif;
+  font-size: 0.86rem;
+  line-height: 1.7;
+  color: var(--ink);
+  background: var(--dialogue-bg);
+  border: 1px solid var(--paper-edge);
+  border-radius: 12px 12px 4px 12px;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(8px) scale(0.96);
+  transform-origin: bottom right;
+  transition: opacity 0.28s ease, transform 0.28s ease;
+  pointer-events: none;
+}
+.mascot-bubble.is-show { opacity: 1; transform: none; }
+.mascot-bubble::after {
+  content: "";
+  position: absolute;
+  right: -7px;
+  bottom: 20px;
+  width: 12px;
+  height: 12px;
+  background: var(--dialogue-bg);
+  border-right: 1px solid var(--paper-edge);
+  border-bottom: 1px solid var(--paper-edge);
+  transform: rotate(-45deg);
+}
+@media (max-width: 640px) {
+  .mascot { width: 92px; right: 10px; bottom: 10px; }
+  .mascot-bubble { right: 68%; font-size: 0.8rem; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 
@@ -3777,6 +3844,58 @@ musicSavePublished?.addEventListener("click", async () => {
   finally { musicSavePublished.disabled = false; }
 });
 
+/* ── 看板娘 ────────────────────────────────────────────── */
+
+(function mascot() {
+  const mascot = document.getElementById("mascot");
+  const bubble = document.getElementById("mascotBubble");
+  if (!mascot || !bubble) return;
+
+  const lines = [
+    "呐，你来了。今天也想和你多待一会儿。",
+    "这个文学部，是只属于我们两个人的秘密基地哦。",
+    "点我干嘛啦……再点，我可是会害羞的。",
+    "深夜、黄昏、白昼——你最喜欢哪一个我呢？",
+    "项目都看过了吗？每一张 CG，都是我为你留的。",
+    "要不要听首歌？BGM 开关在右上角，别找错啦。",
+    "你的到来，让这个页面有了心跳声。",
+    "别走太快，樱花还没落完呢。",
+  ];
+  let timer = 0;
+  let last = -1;
+  function speak(text, hold = 3600) {
+    bubble.textContent = text;
+    bubble.classList.add("is-show");
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => bubble.classList.remove("is-show"), hold);
+  }
+  function poke() {
+    let i;
+    do { i = Math.floor(Math.random() * lines.length); } while (i === last);
+    last = i;
+    speak(lines[i]);
+    if (!prefersReducedMotion) {
+      mascot.animate(
+        [
+          { transform: "scale(1)" },
+          { transform: "scale(1.08) rotate(-2deg)" },
+          { transform: "scale(1)" },
+        ],
+        { duration: 420, easing: "ease-out" }
+      );
+    }
+  }
+  mascot.addEventListener("click", poke);
+  mascot.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      poke();
+    }
+  });
+  // 初见打招呼
+  window.setTimeout(() => speak("欢迎来到深夜文学部，我是 Monika，请多指教！", 4800), 2600);
+})();
+
 /* ── 全局 Escape ─────────────────────────────────────── */
 
 document.addEventListener("keydown", (event) => {
@@ -3795,6 +3914,12 @@ loadPublicMusic();
 syncMusicAdminSession();
 
 </script>
+    <!-- ── 看板娘立绘 ── -->
+    <div class="mascot" id="mascot" role="button" tabindex="0" aria-label="看板娘 Monika，点击有话说">
+      <div class="mascot-bubble" id="mascotBubble" aria-hidden="true"></div>
+      <img class="mascot-img" src="assets/monika-chibi.png" alt="" draggable="false">
+    </div>
+
     <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
   </body>
 </html>
