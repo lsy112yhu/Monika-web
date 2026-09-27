@@ -2138,6 +2138,73 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
   .loader-bar i { animation: none !important; }
 }
 
+/* ── 20260927 响应式紧凑布局修正 ───────────────────── */
+/* 主内容使用完整视口，避免宽屏右侧出现大块空白。 */
+.hero,
+.chapter,
+.scene-change,
+.site-footer {
+  width: 100%;
+  max-width: none;
+}
+
+.hero {
+  padding: clamp(32px, 6vh, 72px) clamp(18px, 5vw, 80px) clamp(24px, 4vh, 48px);
+  gap: clamp(22px, 4vh, 44px);
+}
+
+.hero-stage {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 430px);
+  gap: clamp(24px, 5vw, 80px);
+}
+
+.dialogue {
+  max-width: none;
+}
+
+.chapter {
+  padding: clamp(36px, 6vh, 72px) clamp(18px, 5vw, 80px) 0;
+}
+
+.mascot {
+  right: clamp(8px, 1.5vw, 24px);
+  width: clamp(96px, 9vw, 120px);
+}
+
+.mascot-bubble {
+  right: 2px;
+  max-width: min(210px, 28vw);
+}
+
+@media (max-width: 900px) {
+  .hero {
+    padding: 24px 14px 14px;
+  }
+
+  .chapter {
+    padding-inline: 14px;
+  }
+
+  .hero-stage {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .mascot {
+    width: 64px;
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom, 8px));
+  }
+
+  .mascot-bubble {
+    right: 0;
+    max-width: min(164px, 48vw);
+    padding: 7px 10px;
+  }
+}
+
 </style>
     <noscript><style>.site-loader { display: none; }</style></noscript>
     <script>
