@@ -2205,6 +2205,31 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
   }
 }
 
+/* ── 20260927 移动端视口收紧修正 ───────────────────── */
+@media (max-width: 900px) {
+  .hero,
+  .chapter,
+  .hero-stage,
+  .hero-status,
+  .dialogue {
+    width: 100%;
+    max-width: none;
+  }
+
+  /* 某些手机浏览器的 CSS 视口会落在 768px 以上，仍按手机尺寸处理。 */
+  .mascot {
+    width: 56px;
+    right: 10px;
+    bottom: max(18px, env(safe-area-inset-bottom, 18px));
+  }
+
+  .mascot-bubble {
+    right: 0;
+    max-width: min(150px, 42vw);
+    bottom: calc(100% + 8px);
+  }
+}
+
 </style>
     <noscript><style>.site-loader { display: none; }</style></noscript>
     <script>
