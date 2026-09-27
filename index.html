@@ -389,7 +389,7 @@ body.bgm-playing .bgm-chip { border-color: var(--sakura); color: var(--sakura); 
 
 .hero {
   position: relative;
-  max-width: min(1480px, 94vw);
+  max-width: min(1760px, 95vw);
   margin: 0 auto;
   padding: clamp(48px, 9vh, 110px) clamp(18px, 4vw, 46px) clamp(30px, 5vh, 60px);
   display: flex;
@@ -618,7 +618,7 @@ body.bgm-playing .bgm-chip { border-color: var(--sakura); color: var(--sakura); 
 /* ── 章节 ─────────────────────────────────────────────── */
 
 .chapter {
-  max-width: min(1480px, 94vw);
+  max-width: min(1760px, 95vw);
   margin: 0 auto;
   padding: clamp(44px, 8vh, 90px) clamp(18px, 4vw, 46px) 0;
 }
@@ -917,7 +917,7 @@ body.bgm-playing .bgm-chip { border-color: var(--sakura); color: var(--sakura); 
 .site-footer {
   position: relative;
   z-index: 2;
-  max-width: min(1480px, 94vw);
+  max-width: min(1760px, 95vw);
   margin: 0 auto;
   padding: clamp(50px, 9vh, 100px) clamp(18px, 4vw, 46px) 46px;
   text-align: center;
@@ -1855,7 +1855,7 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
 
 .scene-change {
   position: relative;
-  max-width: min(1480px, 94vw);
+  max-width: min(1760px, 95vw);
   margin: clamp(30px, 6vh, 58px) auto 0;
   padding: 0 clamp(18px, 4vw, 46px);
   overflow: hidden;
@@ -2028,62 +2028,93 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
 /* ── 看板娘立绘 ─────────────────────────────── */
 .mascot {
   position: fixed;
-  right: 22px;
-  bottom: 16px;
+  right: clamp(18px, 3.5vw, 44px);
+  bottom: 0;
   z-index: 60;
-  width: 148px;
-  cursor: grab;
-  touch-action: none;
+  width: 152px;
+  cursor: pointer;
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  transition: transform 0.2s ease;
 }
-.mascot.is-dragging { cursor: grabbing; }
-.mascot:focus-visible { outline: 2px solid var(--sakura); outline-offset: 4px; border-radius: 12px; }
+.mascot:active {
+  transform: scale(0.97);
+}
+.mascot:focus-visible {
+  outline: 2px solid var(--sakura);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
 .mascot-img {
   display: block;
   width: 100%;
   height: auto;
-  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
-  animation: mascotFloat 5.2s ease-in-out infinite;
-  transform-origin: 50% 92%;
-  transition: filter 0.6s ease;
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.45));
+  animation: mascotBreathe 4.8s ease-in-out infinite;
+  transform-origin: 50% 100%;
   user-select: none;
   pointer-events: none;
 }
-@keyframes mascotFloat {
-  0%, 100% { transform: translateY(0) rotate(-0.8deg); }
-  50% { transform: translateY(-11px) rotate(0.8deg); }
+@keyframes mascotBreathe {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(-3px) scaleY(1.015); }
 }
-[data-era="day"] .mascot-img { filter: drop-shadow(0 10px 18px rgba(96, 64, 40, 0.35)); }
+[data-era="day"] .mascot-img {
+  filter: drop-shadow(0 8px 20px rgba(96, 64, 40, 0.35));
+}
 .mascot-bubble {
-  position: fixed;
-  z-index: 61;
-  left: 0;
-  top: 0;
-  width: min(225px, 68vw);
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 6px;
+  width: max-content;
+  max-width: min(220px, 64vw);
   padding: 10px 14px;
   font-family: "Noto Serif SC", serif;
-  font-size: 0.86rem;
-  line-height: 1.7;
+  font-size: 0.84rem;
+  line-height: 1.6;
   color: var(--ink);
   background: var(--dialogue-bg);
   border: 1px solid var(--paper-edge);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
+  border-radius: 14px 14px 4px 14px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
   opacity: 0;
   visibility: hidden;
-  cursor: grab;
-  touch-action: none;
-  transition: opacity 0.28s ease, visibility 0.28s ease;
+  transform: translateY(8px) scale(0.95);
+  transition: opacity 0.24s ease, transform 0.24s ease, visibility 0.24s;
+  pointer-events: none;
+  cursor: pointer;
 }
-.mascot-bubble.is-show { opacity: 1; visibility: visible; }
-.mascot-bubble.is-dragging { cursor: grabbing; }
-@media (max-width: 640px) {
-  .mascot { width: 88px; right: 8px; bottom: 8px; }
+.mascot-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  right: 18px;
+  width: 10px;
+  height: 6px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+  background: var(--dialogue-bg);
+  border-right: 1px solid var(--paper-edge);
+  border-bottom: 1px solid var(--paper-edge);
+}
+.mascot-bubble.is-show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+@media (max-width: 768px) {
+  .mascot {
+    width: 82px;
+    right: 12px;
+    bottom: max(16px, env(safe-area-inset-bottom, 16px));
+    touch-action: auto;
+  }
   .mascot-bubble {
     font-size: 0.78rem;
-    max-width: min(190px, 58vw);
-    padding: 8px 11px;
-    line-height: 1.55;
+    max-width: min(180px, 52vw);
+    padding: 7px 11px;
+    bottom: calc(100% + 6px);
+    right: 0;
   }
 }
 
@@ -2148,10 +2179,10 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
     <div class="backdrop-vignette" aria-hidden="true"></div>
 
     <!-- ── 看板娘立绘 ── -->
-    <div class="mascot" id="mascot" role="button" tabindex="0" aria-label="看板娘 Monika，拖动可挪开，点击有话说">
-      <img class="mascot-img" src="assets/monika-chibi-blink.webp" alt="" draggable="false">
+    <div class="mascot" id="mascot" role="button" tabindex="0" aria-label="看板娘 Monika，点击有话说">
+      <div class="mascot-bubble" id="mascotBubble" aria-hidden="true" role="status"></div>
+      <img class="mascot-img" src="assets/monika-chibi-blink.webp" alt="看板娘 Monika" draggable="false">
     </div>
-    <div class="mascot-bubble" id="mascotBubble" aria-hidden="true"></div>
 
     <!-- ── 页眉 ── -->
     <header class="site-header" id="siteHeader">
@@ -3836,132 +3867,106 @@ musicSavePublished?.addEventListener("click", async () => {
   }
 
   const lines = [
-    "呐，你来了。今天也想和你多待一会儿。",
+    "相公，你来了呀。今天也想和你多待一会儿♪",
     "这个文学部，是只属于我们两个人的秘密基地哦。",
     "点我干嘛啦……再点，我可是会害羞的。",
     "深夜、黄昏、白昼——你最喜欢哪一个我呢？",
-    "项目都看过了吗？每一张 CG，都是我为你留的。",
+    "项目都看过了吗？每一张 CG，都是为你留的。",
     "要不要听首歌？BGM 开关在右上角，别找错啦。",
-    "你的到来，让这个页面有了心跳声。",
+    "相公的到来，让这个页面有了心跳声。",
     "别走太快，樱花还没落完呢。",
   ];
   let timer = 0;
   let last = -1;
-  let bubbleShift = { x: -20, y: -78 };
-  let bubbleCustom = false;
-  let dragged = false;
 
-  function clamp(value, min, max) {
-    return Math.min(Math.max(value, min), max);
-  }
-  function placeMascot(x, y) {
-    const rect = mascot.getBoundingClientRect();
-    const left = clamp(x, 4, window.innerWidth - rect.width - 4);
-    const top = clamp(y, 4, window.innerHeight - rect.height - 4);
-    mascot.style.left = `${left}px`;
-    mascot.style.top = `${top}px`;
-    mascot.style.right = "auto";
-    mascot.style.bottom = "auto";
-  }
-  function placeBubble() {
-    const host = mascot.getBoundingClientRect();
-    const bw = bubble.offsetWidth || 190;
-    const bh = bubble.offsetHeight || 64;
-    if (!bubbleCustom) {
-      // 默认初始位置：紧凑贴在看板娘左上方，不越过视口边缘
-      const left = clamp(host.right - bw - 10, 8, window.innerWidth - bw - 8);
-      const top = clamp(host.top - bh - 8, 8, window.innerHeight - bh - 8);
-      bubble.style.left = `${left}px`;
-      bubble.style.top = `${top}px`;
-      return;
-    }
-    const left = clamp(host.left + bubbleShift.x, 8, window.innerWidth - bw - 8);
-    const top = clamp(host.top + bubbleShift.y, 8, window.innerHeight - bh - 8);
-    bubble.style.left = `${left}px`;
-    bubble.style.top = `${top}px`;
-  }
-  function speak(text, hold = 3600) {
+  function speak(text, hold = 3400) {
     bubble.textContent = text;
     bubble.classList.add("is-show");
-    placeBubble();
     window.clearTimeout(timer);
     timer = window.setTimeout(() => bubble.classList.remove("is-show"), hold);
   }
+
   function poke() {
     let i;
     do { i = Math.floor(Math.random() * lines.length); } while (i === last);
     last = i;
     speak(lines[i]);
   }
-  function bindDrag(target, onMove, onDrop) {
-    let startX = 0;
-    let startY = 0;
-    let originX = 0;
-    let originY = 0;
-    let active = false;
-    function point(event) {
-      const touch = event.touches ? event.touches[0] : event;
-      return { x: touch.clientX, y: touch.clientY };
-    }
-    function start(event) {
-      if (event.button != null && event.button !== 0) return;
-      const p = point(event);
-      const box = target.getBoundingClientRect();
-      startX = p.x;
-      startY = p.y;
-      originX = box.left;
-      originY = box.top;
-      active = true;
-      dragged = false;
-      target.classList.add("is-dragging");
-      target.setPointerCapture?.(event.pointerId);
-    }
-    function move(event) {
-      if (!active) return;
-      const p = point(event);
-      if (Math.hypot(p.x - startX, p.y - startY) > 6) dragged = true;
-      if (!dragged) return;
-      event.preventDefault();
-      onMove(originX + p.x - startX, originY + p.y - startY);
-    }
-    function end() {
-      if (!active) return;
-      active = false;
-      target.classList.remove("is-dragging");
-      if (dragged && onDrop) onDrop();
-    }
-    target.addEventListener("pointerdown", start);
-    target.addEventListener("pointermove", move);
-    target.addEventListener("pointerup", end);
-    target.addEventListener("pointercancel", end);
-  }
 
-  bindDrag(mascot, (x, y) => {
-    placeMascot(x, y);
-    if (bubble.classList.contains("is-show")) placeBubble();
+  // 点击气泡本身即可立刻收起，绝不碍眼
+  bubble.addEventListener("click", (e) => {
+    e.stopPropagation();
+    bubble.classList.remove("is-show");
   });
-  bindDrag(bubble, (x, y) => {
-    const host = mascot.getBoundingClientRect();
-    bubbleCustom = true;
-    bubbleShift = { x: x - host.left, y: y - host.top };
-    bubble.style.left = `${x}px`;
-    bubble.style.top = `${y}px`;
+
+  // 点击立绘互动（移动端与桌面端通用）
+  mascot.addEventListener("click", () => {
+    poke();
   });
-  mascot.addEventListener("click", () => { if (!dragged) poke(); });
+
   mascot.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       poke();
     }
   });
-  window.addEventListener("resize", () => {
-    if (mascot.style.left) {
-      const box = mascot.getBoundingClientRect();
-      placeMascot(box.left, box.top);
-    }
-    if (bubble.classList.contains("is-show")) placeBubble();
-  });
-  window.setTimeout(() => speak("欢迎来到深夜文学部，我是 Monika，请多指教！", 4800), 2600);
+
+  // 仅在桌面端精细鼠标指针环境下允许自由拖动；触摸屏/手机环境绝对不抢占滑动与位置
+  if (window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    let origLeft = 0, origTop = 0;
+    let dragged = false;
+
+    mascot.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      const rect = mascot.getBoundingClientRect();
+      startX = e.clientX;
+      startY = e.clientY;
+      origLeft = rect.left;
+      origTop = rect.top;
+      isDragging = true;
+      dragged = false;
+
+      function onMouseMove(moveEvent) {
+        if (!isDragging) return;
+        const dx = moveEvent.clientX - startX;
+        const dy = moveEvent.clientY - startY;
+        if (Math.hypot(dx, dy) > 5) {
+          dragged = true;
+          mascot.style.position = "fixed";
+          const w = mascot.offsetWidth;
+          const h = mascot.offsetHeight;
+          const left = Math.min(Math.max(origLeft + dx, 10), window.innerWidth - w - 10);
+          const top = Math.min(Math.max(origTop + dy, 10), window.innerHeight - h - 10);
+          mascot.style.left = `${left}px`;
+          mascot.style.top = `${top}px`;
+          mascot.style.right = "auto";
+          mascot.style.bottom = "auto";
+        }
+      }
+
+      function onMouseUp() {
+        isDragging = false;
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+      }
+
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    });
+
+    // 桌面端双击立绘快速复位回右下角贴底
+    mascot.addEventListener("dblclick", () => {
+      mascot.style.left = "";
+      mascot.style.top = "";
+      mascot.style.right = "";
+      mascot.style.bottom = "";
+    });
+  }
+
+  // 进站 2.4 秒后轻柔问候，移动端与桌面端均贴靠立绘头顶，绝不横向遮挡居中主视区
+  window.setTimeout(() => speak("相公，欢迎回来~♪", 3400), 2400);
 })();
 
 /* ── 全局 Escape ─────────────────────────────────────── */
