@@ -2139,7 +2139,7 @@ body.bgm-playing .bgm-play-btn .ic-pause { display: block; }
     <!-- ── 看板娘立绘 ── -->
     <div class="mascot" id="mascot" role="button" tabindex="0" aria-label="看板娘 Monika，点击有话说">
       <div class="mascot-bubble" id="mascotBubble" aria-hidden="true"></div>
-      <img class="mascot-img" src="assets/monika-chibi.png" alt="" draggable="false">
+      <img class="mascot-img" src="assets/monika-chibi-blink.webp" alt="" draggable="false">
     </div>
 
     <!-- ── 页眉 ── -->
@@ -3856,6 +3856,12 @@ musicSavePublished?.addEventListener("click", async () => {
   const mascot = document.getElementById("mascot");
   const bubble = document.getElementById("mascotBubble");
   if (!mascot || !bubble) return;
+
+  // 减少动态偏好：用静态睁眼帧代替眨眼动图
+  if (prefersReducedMotion) {
+    const img = mascot.querySelector(".mascot-img");
+    if (img) img.src = "assets/monika-chibi.png";
+  }
 
   const lines = [
     "呐，你来了。今天也想和你多待一会儿。",
