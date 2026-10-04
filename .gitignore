@@ -8,3 +8,8 @@ __pycache__/
 !.env.example
 server/**/state.json
 server/**/friends.json
+node_modules/
+.env.*
+!.env.example
+.openai/
+qa-*.png
