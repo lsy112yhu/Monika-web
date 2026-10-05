@@ -7,9 +7,27 @@
     enabledTracks: 'monika-desk-enabled-tracks',
     friends: 'monika-desk-friends',
     localRequests: 'monika-desk-friend-requests',
+    lastFriendSubmission: 'monika-desk-last-friend-submission',
     admin: 'monika-desk-admin',
     theme: 'monika-desk-theme'
   };
+
+  var THEME_MODES = ['system', 'light', 'dark', 'time'];
+  var THEME_CYCLE = ['light', 'dark', 'time'];
+  var MASCOT_MESSAGES = [
+    '欢迎来到文学部~ 你也是来参加今天部活的吗？',
+    '这个文学部，是留存我们所有回忆的秘密基地哦。',
+    '戳我干嘛啦……莫非是在找什么隐藏代码？',
+    '深夜、黄昏、白昼——你最喜欢哪一个时刻的我呢？',
+    '项目都浏览过了吗？每一段记录，都值得细细品味呢。',
+    '要不要听首歌？BGM 播放器在右上角，挑一首喜欢的吧♪',
+    '每一次到访，都会让这个页面重新跃动起心跳声。',
+    '稍微停留一会儿吧，樱花还没落完呢。',
+    'Just Monika. ……开个玩笑啦♪'
+  ];
+  var MASCOT_TRIPLE_CLICK_WINDOW = 700;
+  var MASCOT_EASTER_EGG_COOLDOWN = 2600;
+  var MASCOT_EASTER_EGG_DURATION = 2000;
 
   var BUILTIN_TRACKS = [
     {
@@ -62,11 +80,28 @@
     trackIndex: Number(localStorage.getItem(STORAGE.currentTrack) || 0),
     enabledTrackIds: readEnabledTracks(),
     friends: readJSON(STORAGE.friends, DEFAULT_FRIENDS),
+    lastFriendSubmission: readJSON(STORAGE.lastFriendSubmission, null),
     friendApi: null,
     musicApi: false,
+    musicAdmin: {
+      supported: null,
+      authenticated: false,
+      connected: false,
+      uin: '',
+      catalog: [],
+      tracks: [],
+      lastSyncAt: '',
+      error: ''
+    },
     admin: null,
+    themeMode: readThemeMode(),
     currentLyric: -1,
-    localTracks: []
+    localTracks: [],
+    mascotRecentMessages: [],
+    mascotClickCount: 0,
+    mascotLastClickAt: 0,
+    mascotEggCooldownUntil: 0,
+    mascotHideTimer: null
   };
 
   var audio = document.getElementById('audioElement');
@@ -81,6 +116,31 @@
   }
   function saveJSON(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (error) {}
+  }
+  function readThemeMode() {
+    try {
+      var saved = localStorage.getItem(STORAGE.theme);
+      return THEME_MODES.indexOf(saved) !== -1 ? saved : 'system';
+    } catch (error) { return 'system'; }
+  }
+  function resolveTheme(mode, now) {
+    if (mode === 'dark' || mode === 'light') return mode;
+    if (mode === 'time') {
+      var hour = (now || new Date()).getHours();
+      return hour >= 7 && hour < 19 ? 'light' : 'dark';
+    }
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function isLateNight(now) {
+    var hour = (now || new Date()).getHours();
+    return hour >= 22 || hour < 6;
+  }
+  function themeLabel(mode) {
+    return mode === 'light' ? '浅色' : mode === 'dark' ? '暗色' : mode === 'time' ? '随时间' : '系统';
+  }
+  function nextThemeMode(mode) {
+    var index = THEME_CYCLE.indexOf(mode);
+    return THEME_CYCLE[(index + 1 + THEME_CYCLE.length) % THEME_CYCLE.length];
   }
   function readEnabledTracks() {
     var raw = readJSON(STORAGE.enabledTracks, null);
@@ -120,20 +180,34 @@
     var now = new Date();
     $('timeReadout').textContent = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
     $('dateReadout').textContent = now.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+    updateRadioCopy(now);
+    if (state.themeMode === 'time') applyTheme('time', { persist: false, now: now });
   }
 
-  function applyTheme(theme) {
-    var nextTheme = theme === 'dark' ? 'dark' : 'light';
+  function updateRadioCopy(now) {
+    var title = $('radioTitle');
+    if (title) title.textContent = isLateNight(now) ? '深夜电台' : 'soft signals';
+  }
+
+  function applyTheme(mode, options) {
+    var settings = options || {};
+    var nextMode = THEME_MODES.indexOf(mode) !== -1 ? mode : 'system';
+    var nextTheme = resolveTheme(nextMode, settings.now);
+    state.themeMode = nextMode;
     document.documentElement.dataset.theme = nextTheme;
-    try { localStorage.setItem(STORAGE.theme, nextTheme); } catch (error) {}
+    document.documentElement.dataset.themeMode = nextMode;
+    if (settings.persist !== false && nextMode !== 'system') {
+      try { localStorage.setItem(STORAGE.theme, nextMode); } catch (error) {}
+    }
     var icon = $('themeIcon');
     var label = $('themeLabel');
     var toggle = $('themeToggle');
-    if (icon) icon.textContent = nextTheme === 'dark' ? '☀' : '☾';
-    if (label) label.textContent = nextTheme === 'dark' ? 'light' : 'dark';
+    if (icon) icon.textContent = nextMode === 'time' ? '◷' : nextMode === 'dark' ? '☀' : nextMode === 'light' ? '☾' : '◌';
+    if (label) label.textContent = themeLabel(nextMode);
     if (toggle) {
-      toggle.setAttribute('aria-pressed', nextTheme === 'dark' ? 'true' : 'false');
-      toggle.setAttribute('aria-label', nextTheme === 'dark' ? '切换到浅色模式' : '切换到暗色模式');
+      toggle.setAttribute('aria-pressed', nextMode === 'dark' ? 'true' : 'false');
+      toggle.setAttribute('aria-label', '当前为' + themeLabel(nextMode) + '模式，点击循环切换主题');
+      toggle.title = '当前：' + themeLabel(nextMode) + '；点击循环：浅色 / 暗色 / 跟随时间';
     }
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', nextTheme === 'dark' ? '#101a17' : '#e9f4ed');
@@ -239,6 +313,33 @@
     }).join('');
   }
 
+  function saveFriendSubmission(status, payload) {
+    state.lastFriendSubmission = {
+      status: status,
+      name: payload.name,
+      url: payload.url,
+      createdAt: new Date().toISOString()
+    };
+    saveJSON(STORAGE.lastFriendSubmission, state.lastFriendSubmission);
+    renderFriendSubmissionStatus();
+  }
+
+  function renderFriendSubmissionStatus() {
+    var holder = $('friendSubmissionStatus');
+    if (!holder) return;
+    var submission = state.lastFriendSubmission;
+    var editing = Boolean($('friendEditId') && $('friendEditId').value);
+    if (!submission || editing) {
+      holder.hidden = true;
+      holder.innerHTML = '';
+      return;
+    }
+    var isPublished = submission.status === 'published';
+    holder.hidden = false;
+    holder.className = 'submission-status ' + (isPublished ? 'is-published' : 'is-local');
+    holder.innerHTML = '<strong>' + (isPublished ? '已发布' : '本地暂存') + '</strong><span>' + (isPublished ? '这条友链已写入云端列表，所有访客都可见。' : '仅本机可见，尚未提交给站长。') + '</span>';
+  }
+
   function renderSiteStatus(payload) {
     var card = $('siteStatusCard');
     if (!payload || !Array.isArray(payload.sites)) { card.hidden = true; return; }
@@ -299,20 +400,23 @@
     }
     try {
       var music = await apiRequest('/api/music/playlist');
+      state.musicApi = Boolean(music && (Array.isArray(music.tracks) || Object.prototype.hasOwnProperty.call(music, 'available')));
       if (Array.isArray(music.tracks) && music.tracks.length) {
         state.tracks = music.tracks.map(function (track) {
           return Object.assign({}, track, { src: track.stream || track.src, lyrics: track.lyrics || [] });
         });
         state.enabledTrackIds = state.tracks.map(function (track) { return track.id; });
         state.trackIndex = 0;
-        state.musicApi = true;
         renderTrack();
       }
-    } catch (error) {}
+    } catch (error) {
+      state.musicApi = false;
+    }
   }
 
   function openDialog(id) {
     var dialog = $(id);
+    if (dialog.open) return;
     if (typeof dialog.showModal === 'function') dialog.showModal();
     else dialog.setAttribute('open', '');
   }
@@ -342,6 +446,7 @@
     $('friendFormError').textContent = '';
     $('friendDialogTitle').textContent = friend ? '编辑桌边链接' : '申请一张桌边座位';
     $('friendSubmitButton').innerHTML = friend ? '保存修改 <span>✓</span>' : '提交申请 <span>↗</span>';
+    renderFriendSubmissionStatus();
   }
 
   async function submitFriend(event) {
@@ -372,7 +477,8 @@
         state.friends = created.links || state.friends;
         renderFriends();
         closeDialog('friendDialog');
-        showToast('申请已提交，欢迎来坐一会儿。');
+        saveFriendSubmission('published', payload);
+        showToast('申请已发布，已出现在友链列表。');
         return;
       }
     } catch (error) {
@@ -390,29 +496,110 @@
       var requests = readJSON(STORAGE.localRequests, []);
       requests.push(Object.assign({ id: 'local-' + Date.now(), status: 'pending', createdAt: new Date().toISOString() }, payload));
       saveJSON(STORAGE.localRequests, requests);
+      saveFriendSubmission('local_pending', payload);
       closeDialog('friendDialog');
-      showToast('后端未连接，申请已暂存于本机。');
+      showToast('本地暂存（仅本机可见，未提交）。');
     }
+  }
+
+  function applyMusicAdminState(payload) {
+    var data = payload || {};
+    state.musicAdmin = {
+      supported: true,
+      authenticated: true,
+      connected: Boolean(data.connected),
+      uin: String(data.uin || ''),
+      catalog: Array.isArray(data.catalog) ? data.catalog : [],
+      tracks: Array.isArray(data.tracks) ? data.tracks : [],
+      lastSyncAt: String(data.lastSyncAt || ''),
+      error: ''
+    };
+  }
+
+  function musicErrorMessage(error) {
+    return error && error.message ? error.message : '音乐服务暂时不可用。';
+  }
+
+  async function loadMusicAdminState() {
+    try {
+      var session = await apiRequest('/api/music/session', { headers: {} });
+      state.musicAdmin.supported = true;
+      state.musicAdmin.authenticated = Boolean(session.authenticated);
+      state.musicAdmin.error = '';
+      if (session.authenticated) {
+        var adminState = await apiRequest('/api/music/admin', { headers: {} });
+        applyMusicAdminState(adminState);
+      }
+      return state.musicAdmin.authenticated;
+    } catch (error) {
+      var unavailable = !error.status || error.status === 404;
+      state.musicAdmin.supported = !unavailable;
+      state.musicAdmin.authenticated = false;
+      state.musicAdmin.error = unavailable ? '' : musicErrorMessage(error);
+      return false;
+    }
+  }
+
+  function musicAdminMarkup() {
+    var music = state.musicAdmin;
+    if (music.supported !== true) return '';
+    if (!music.authenticated) {
+      return '<section class="music-admin-panel" aria-labelledby="musicAdminTitle"><div class="music-admin-heading"><div><span class="modal-kicker">MUSIC DESK</span><h3 id="musicAdminTitle">音乐管理</h3></div><span class="music-status is-muted">需要音乐服务登录</span></div><p class="music-help">音乐服务使用独立会话。可以使用同一组管理员账号重新登录，连接后即可刷新歌单、同步曲目和发布播放列表。</p><form id="musicLoginForm" data-music-login><div class="music-login-grid"><label>账号<input id="musicAdminUsername" autocomplete="username" required></label><label>密码<input id="musicAdminPassword" type="password" autocomplete="current-password" required></label></div><button class="button button-ghost small" type="submit">登录音乐服务 <span>→</span></button></form><p class="music-error" role="alert">' + escapeHTML(music.error || '') + '</p></section>';
+    }
+    var catalogOptions = music.catalog.length ? music.catalog.map(function (item) {
+      return '<option value="' + escapeHTML(item.id) + '">' + escapeHTML(item.title || item.name || item.id) + (item.count ? ' · ' + escapeHTML(item.count) + ' 首' : '') + '</option>';
+    }).join('') : '<option value="">请先刷新 QQ 音乐歌单</option>';
+    var tracks = music.tracks.length ? music.tracks.map(function (track) {
+      var published = Boolean(track.published);
+      return '<label class="music-track-item"><input type="checkbox" data-music-publish value="' + escapeHTML(track.id) + '" aria-label="发布 ' + escapeHTML(track.title || '未命名歌曲') + '"' + (published ? ' checked' : '') + '><span><strong>' + escapeHTML(track.title || '未命名歌曲') + '</strong><small>' + escapeHTML(track.artist || '未知艺人') + '</small></span><em>' + (published ? '已发布' : '未发布') + '</em></label>';
+    }).join('') : '<p class="music-empty">还没有同步曲目，请选择一个歌单后同步。</p>';
+    var connectedText = music.connected ? 'QQ 音乐已连接' + (music.uin ? ' · ' + escapeHTML(music.uin) : '') : '尚未连接 QQ 音乐';
+    var syncText = music.lastSyncAt ? '上次同步：' + escapeHTML(new Date(music.lastSyncAt).toLocaleString('zh-CN')) : '尚未同步';
+    return '<section class="music-admin-panel" aria-labelledby="musicAdminTitle"><div class="music-admin-heading"><div><span class="modal-kicker">MUSIC DESK</span><h3 id="musicAdminTitle">音乐管理</h3></div><span class="music-status ' + (music.connected ? 'is-connected' : 'is-muted') + '">' + connectedText + '</span></div><div class="music-admin-actions"><button class="button button-ghost small" type="button" data-music-action="refresh">刷新歌单 <span>↻</span></button><span class="music-sync-time">' + syncText + '</span></div><details class="music-credentials"><summary>连接 QQ 音乐账号</summary><p class="music-help">Cookie 只提交给同源音乐服务，不会保存到浏览器。</p><textarea id="musicCookieText" rows="3" placeholder="uin=...; qm_keyst=..."></textarea><button class="button button-ghost small" type="button" data-music-action="credentials">保存凭据并刷新 <span>↗</span></button></details><div class="music-sync-grid"><label>选择歌单<select id="musicCatalogSelect"' + (music.catalog.length ? '' : ' disabled') + '>' + catalogOptions + '</select></label><button class="button button-ghost small" type="button" data-music-action="sync"' + (music.catalog.length ? '' : ' disabled') + '>同步曲目 <span>↓</span></button></div><div class="music-publish-heading"><span>已同步曲目</span><small>勾选后发布到前台</small></div><div class="music-track-list">' + tracks + '</div><button class="button button-dark small music-publish-button" type="button" data-music-action="publish"' + (music.tracks.length ? '' : ' disabled') + '>发布选中曲目 <span>✓</span></button><p class="music-error" id="musicAdminError" role="alert">' + escapeHTML(music.error || '') + '</p></section>';
   }
 
   async function openAdmin() {
     openDialog('adminDialog');
-    if (state.admin) { renderAdminPanel(); return; }
-    try {
-      var session = await apiRequest('/api/friends/session', { headers: {} });
-      if (session.authenticated) {
-        state.admin = { user: session.user || 'admin' };
-        saveJSON(STORAGE.admin, state.admin);
-        renderAdminPanel();
+    if (state.admin) {
+      try {
+        var storedSession = await apiRequest('/api/friends/session', { headers: {} });
+        if (storedSession.authenticated) state.friendApi = true;
+        else state.admin = null;
+      } catch (error) {
+        state.admin = null;
       }
-    } catch (error) {}
+    }
+    if (!state.admin) {
+      try {
+        var session = await apiRequest('/api/friends/session', { headers: {} });
+        if (session.authenticated) {
+          state.friendApi = true;
+          state.admin = { user: session.user || 'admin' };
+        }
+      } catch (error) {
+        state.friendApi = false;
+      }
+    }
+    await loadMusicAdminState();
+    if (!state.admin && state.musicAdmin.authenticated) state.admin = { user: 'music-admin' };
+    if (state.admin) {
+      saveJSON(STORAGE.admin, state.admin);
+      renderAdminPanel();
+    } else {
+      renderAdminLogin();
+    }
+  }
+
+  function renderAdminLogin(errorMessage) {
+    $('adminContent').innerHTML = '<form id="adminLoginForm"><p class="modal-help">登录后可审核友链、编辑链接，并查看音乐服务连接状态。</p><label>账号 <input id="adminUsername" autocomplete="username" required></label><label>密码 <input id="adminPassword" type="password" autocomplete="current-password" required></label><div class="form-error" id="adminFormError" role="alert">' + escapeHTML(errorMessage || '') + '</div><button class="button button-dark full" type="submit">进入管理台 <span>→</span></button></form>';
   }
 
   function renderAdminPanel() {
     var remoteStatus = state.friendApi ? '已连接友链 API' : '本地预览模式';
+    var musicStatus = state.musicAdmin.supported === true ? (state.musicAdmin.authenticated ? (state.musicAdmin.connected ? '音乐管理已连接' : '音乐服务待连接') : '音乐服务待登录') : '未检测到音乐 API';
     var pending = readJSON(STORAGE.localRequests, []);
-    var pendingMarkup = pending.length ? '<div class="admin-summary-card"><b>本地待审核申请</b><div class="admin-list">' + pending.map(function (request) { return '<div class="friend-card"><span class="friend-avatar">' + escapeHTML((request.name || '?').slice(0, 1)) + '</span><span class="friend-copy"><strong>' + escapeHTML(request.name) + '</strong><small>' + escapeHTML(request.url) + '</small></span><div class="admin-actions"><button type="button" data-approve-request="' + escapeHTML(request.id) + '">通过</button><button type="button" data-reject-request="' + escapeHTML(request.id) + '">拒绝</button></div></div>'; }).join('') + '</div></div>' : '';
-    $('adminContent').innerHTML = '<div class="admin-summary"><div class="admin-summary-card">当前状态：<b>' + escapeHTML(remoteStatus) + '</b></div><div class="admin-summary-card">友链数量：<b>' + state.friends.length + '</b>　音乐：<b>' + (state.musicApi ? '云端歌单' : '本地歌单') + '</b><button type="button" class="admin-open-playlist" id="adminOpenPlaylist">管理播放列表 →</button></div>' + pendingMarkup + '</div><div class="admin-list">' + state.friends.map(function (friend) { return '<div class="friend-card"><span class="friend-avatar">' + escapeHTML((friend.name || '?').slice(0, 1)) + '</span><span class="friend-copy"><strong>' + escapeHTML(friend.name) + '</strong><small>' + escapeHTML(friend.url) + '</small></span><button class="friend-open" type="button" data-admin-edit="' + escapeHTML(friend.id) + '">✎</button></div>'; }).join('') + '</div><button class="admin-logout" type="button" id="adminLogout">退出管理台</button>';
+    var pendingMarkup = pending.length ? '<div class="admin-summary-card"><b>本地待审核申请</b><small class="admin-summary-help">本地暂存（仅本机可见，未提交）</small><div class="admin-list">' + pending.map(function (request) { return '<div class="friend-card"><span class="friend-avatar">' + escapeHTML((request.name || '?').slice(0, 1)) + '</span><span class="friend-copy"><strong>' + escapeHTML(request.name) + '</strong><small>' + escapeHTML(request.url) + '</small></span><div class="admin-actions"><button type="button" data-approve-request="' + escapeHTML(request.id) + '">通过</button><button type="button" data-reject-request="' + escapeHTML(request.id) + '">拒绝</button></div></div>'; }).join('') + '</div></div>' : '';
+    $('adminContent').innerHTML = '<div class="admin-summary"><div class="admin-summary-card">当前状态：<b>' + escapeHTML(remoteStatus) + '</b></div><div class="admin-summary-card">友链数量：<b>' + state.friends.length + '</b>　音乐：<b>' + escapeHTML(musicStatus) + '</b><button type="button" class="admin-open-playlist" id="adminOpenPlaylist">管理播放列表 →</button></div>' + pendingMarkup + '</div>' + musicAdminMarkup() + '<div class="admin-list">' + state.friends.map(function (friend) { return '<div class="friend-card"><span class="friend-avatar">' + escapeHTML((friend.name || '?').slice(0, 1)) + '</span><span class="friend-copy"><strong>' + escapeHTML(friend.name) + '</strong><small>' + escapeHTML(friend.url) + '</small></span><button class="friend-open" type="button" data-admin-edit="' + escapeHTML(friend.id) + '">✎</button></div>'; }).join('') + '</div><button class="admin-logout" type="button" id="adminLogout">退出管理台</button>';
     renderFriends();
   }
 
@@ -432,19 +619,98 @@
     renderAdminPanel();
   }
 
+  async function loginMusicService(username, password) {
+    try {
+      var result = await apiRequest('/api/music/session', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ username: username, password: password }) });
+      state.musicAdmin.supported = true;
+      state.musicAdmin.authenticated = Boolean(result.authenticated);
+      await loadMusicAdminState();
+      return result;
+    } catch (error) {
+      var unavailable = !error.status || error.status === 404;
+      state.musicAdmin.supported = !unavailable;
+      state.musicAdmin.authenticated = false;
+      if (!unavailable) state.musicAdmin.error = musicErrorMessage(error);
+      throw error;
+    }
+  }
+
+  async function handleMusicLogin(event) {
+    event.preventDefault();
+    var username = $('musicAdminUsername').value.trim();
+    var password = $('musicAdminPassword').value;
+    try {
+      await loginMusicService(username, password);
+      renderAdminPanel();
+      showToast('音乐服务已登录。');
+    } catch (error) {
+      state.musicAdmin.error = musicErrorMessage(error);
+      renderAdminPanel();
+    }
+  }
+
   async function handleAdminLogin(event) {
     event.preventDefault();
+    if (event.target.id === 'musicLoginForm') return handleMusicLogin(event);
     var box = $('adminFormError');
     box.textContent = '';
-    try {
-      var result = await apiRequest('/api/friends/session', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ username: $('adminUsername').value.trim(), password: $('adminPassword').value }) });
-      state.admin = { user: result.user || $('adminUsername').value.trim() };
-      saveJSON(STORAGE.admin, state.admin);
-      renderAdminPanel();
-      showToast('欢迎回来，站长。');
-    } catch (error) {
-      box.textContent = state.friendApi === false ? '本地预览没有可用的管理员 API。' : (error.message || '登录失败。');
+    var username = $('adminUsername').value.trim();
+    var password = $('adminPassword').value;
+    var friendLogin = apiRequest('/api/friends/session', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ username: username, password: password }) });
+    var musicLogin = loginMusicService(username, password);
+    var results = await Promise.allSettled([friendLogin, musicLogin]);
+    var friendOkay = results[0].status === 'fulfilled';
+    var musicOkay = results[1].status === 'fulfilled';
+    if (!friendOkay && !musicOkay) {
+      var firstError = results[0].reason || results[1].reason;
+      box.textContent = firstError && firstError.message ? firstError.message : '登录失败。';
+      return;
     }
+    if (friendOkay) state.friendApi = true;
+    state.admin = { user: (friendOkay && results[0].value.user) || (musicOkay && results[1].value.user) || username || 'admin' };
+    saveJSON(STORAGE.admin, state.admin);
+    await loadMusicAdminState();
+    renderAdminPanel();
+    showToast(friendOkay && musicOkay ? '欢迎回来，站长。' : musicOkay ? '音乐服务已登录。' : '友链管理已登录。');
+  }
+
+  async function musicAdminAction(action) {
+    var headers = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+    try {
+      var response;
+      if (action === 'refresh') {
+        response = await apiRequest('/api/music/admin/catalog', { method: 'POST', headers: headers });
+      } else if (action === 'credentials') {
+        var cookieText = $('musicCookieText').value.trim();
+        if (!cookieText) throw new Error('请先填写 QQ 音乐 Cookie。');
+        response = await apiRequest('/api/music/admin/credentials', { method: 'PUT', headers: headers, body: JSON.stringify({ cookieText: cookieText }) });
+      } else if (action === 'sync') {
+        var playlistId = $('musicCatalogSelect').value;
+        if (!playlistId) throw new Error('请先选择一个 QQ 音乐歌单。');
+        response = await apiRequest('/api/music/admin/sync', { method: 'POST', headers: headers, body: JSON.stringify({ playlistId: playlistId }) });
+      } else if (action === 'publish') {
+        var ids = Array.from(document.querySelectorAll('[data-music-publish]:checked')).map(function (input) { return input.value; });
+        response = await apiRequest('/api/music/admin/published', { method: 'PUT', headers: headers, body: JSON.stringify({ ids: ids }) });
+      } else {
+        return;
+      }
+      applyMusicAdminState(response);
+      renderAdminPanel();
+      showToast(action === 'publish' ? '播放列表已发布。' : action === 'sync' ? '歌单曲目已同步。' : action === 'credentials' ? 'QQ 音乐已连接，歌单已刷新。' : 'QQ 音乐歌单已刷新。');
+    } catch (error) {
+      state.musicAdmin.error = musicErrorMessage(error);
+      renderAdminPanel();
+    }
+  }
+
+  async function logoutAdmin() {
+    try { await apiRequest('/api/friends/session', { method: 'DELETE', headers: { 'X-Requested-With': 'XMLHttpRequest' } }); } catch (error) {}
+    try { await apiRequest('/api/music/session', { method: 'DELETE', headers: { 'X-Requested-With': 'XMLHttpRequest' } }); } catch (error) {}
+    state.admin = null;
+    state.musicAdmin.authenticated = false;
+    localStorage.removeItem(STORAGE.admin);
+    renderFriends();
+    openAdmin();
   }
 
   async function deleteFriend(id) {
@@ -466,9 +732,67 @@
     showToast('本地友链已删除。');
   }
 
+  function setupMascotImage() {
+    var image = $('mascotImage');
+    if (!image) return;
+    var staticSource = image.getAttribute('data-static-src');
+    var animatedSource = './assets/monika-chibi-blink.webp';
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    image.src = reduced && staticSource ? staticSource : animatedSource;
+    if (window.matchMedia) {
+      var query = window.matchMedia('(prefers-reduced-motion: reduce)');
+      var update = function (event) { image.src = event.matches && staticSource ? staticSource : animatedSource; };
+      if (typeof query.addEventListener === 'function') query.addEventListener('change', update);
+      else if (typeof query.addListener === 'function') query.addListener(update);
+    }
+  }
+
+  function nextMascotMessage() {
+    var available = MASCOT_MESSAGES.filter(function (message) { return state.mascotRecentMessages.indexOf(message) === -1; });
+    var pool = available.length ? available : MASCOT_MESSAGES.slice();
+    var message = pool[Math.floor(Math.random() * pool.length)];
+    state.mascotRecentMessages.push(message);
+    if (state.mascotRecentMessages.length > Math.max(1, MASCOT_MESSAGES.length - 1)) state.mascotRecentMessages.shift();
+    return message;
+  }
+
+  function showMascotMessage(message, temporary) {
+    var bubble = $('mascotBubble');
+    if (!bubble) return;
+    clearTimeout(state.mascotHideTimer);
+    bubble.textContent = message;
+    bubble.classList.toggle('is-temporary', Boolean(temporary));
+    bubble.hidden = false;
+    if (temporary) {
+      state.mascotHideTimer = setTimeout(function () {
+        bubble.hidden = true;
+        bubble.classList.remove('is-temporary');
+      }, MASCOT_EASTER_EGG_DURATION);
+    }
+  }
+
+  function handleMascotClick(button) {
+    var now = Date.now();
+    if (now - state.mascotLastClickAt <= MASCOT_TRIPLE_CLICK_WINDOW) state.mascotClickCount += 1;
+    else state.mascotClickCount = 1;
+    state.mascotLastClickAt = now;
+    var eggReady = state.mascotClickCount >= 3 && now >= state.mascotEggCooldownUntil;
+    if (eggReady) {
+      state.mascotClickCount = 0;
+      state.mascotEggCooldownUntil = now + MASCOT_EASTER_EGG_COOLDOWN;
+      showMascotMessage('Can you hear me?', true);
+    } else {
+      if (state.mascotClickCount >= 3) state.mascotClickCount = 1;
+      showMascotMessage(nextMascotMessage(), false);
+    }
+    button.classList.remove('mascot-bounce');
+    void button.offsetWidth;
+    button.classList.add('mascot-bounce');
+  }
+
   function bindEvents() {
     $('themeToggle').addEventListener('click', function () {
-      applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+      applyTheme(nextThemeMode(state.themeMode));
     });
     $('playButton').addEventListener('click', function () { audio.paused ? playAudio() : pauseAudio(); });
     $('prevButton').addEventListener('click', function () { nextTrack(-1); });
@@ -508,14 +832,7 @@
     });
     audio.addEventListener('ended', function () { nextTrack(1); });
     audio.addEventListener('error', function () { showToast('这首音频暂时无法播放，请切换下一首。'); });
-    $('mascotButton').addEventListener('click', function () {
-      var messages = ['你来啦。', '今天也辛苦了。', '要不要听首歌？', '这里留给你。'];
-      var bubble = $('mascotBubble');
-      bubble.textContent = messages[Math.floor(Math.random() * messages.length)];
-      this.classList.remove('mascot-bounce');
-      void this.offsetWidth;
-      this.classList.add('mascot-bounce');
-    });
+    $('mascotButton').addEventListener('click', function () { handleMascotClick(this); });
     $('sayHelloButton').addEventListener('click', function () { $('mascotButton').click(); $('about').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
     $('applyFriendButton').addEventListener('click', function () { resetFriendForm(null); openDialog('friendDialog'); setTimeout(function () { $('friendName').focus(); }, 30); });
     $('friendForm').addEventListener('submit', submitFriend);
@@ -535,7 +852,10 @@
       if (approveId) handleLocalRequest(approveId, true);
       if (rejectId) handleLocalRequest(rejectId, false);
       if (event.target.id === 'adminOpenPlaylist') { closeDialog('adminDialog'); $('playlistManager').hidden = false; renderPlaylistManager(); $('radio').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-      if (event.target.id === 'adminLogout') { state.admin = null; localStorage.removeItem(STORAGE.admin); renderFriends(); openAdmin(); }
+      if (event.target.id === 'adminLogout') logoutAdmin();
+      var actionTarget = event.target.closest ? event.target.closest('[data-music-action]') : event.target;
+      var musicAction = actionTarget && actionTarget.getAttribute('data-music-action');
+      if (musicAction) musicAdminAction(musicAction);
     });
     document.querySelectorAll('[data-close]').forEach(function (button) { button.addEventListener('click', function () { closeDialog(button.getAttribute('data-close')); }); });
     document.querySelectorAll('dialog').forEach(function (dialog) { dialog.addEventListener('click', function (event) { if (event.target === dialog) closeDialog(dialog.id); }); });
@@ -579,9 +899,10 @@
     } catch (error) {}
   }
 
+  setupMascotImage();
   renderTrack();
   renderFriends();
-  applyTheme(document.documentElement.dataset.theme || 'light');
+  applyTheme(state.themeMode, { persist: false });
   updateDateTime();
   setInterval(updateDateTime, 30000);
   bindEvents();

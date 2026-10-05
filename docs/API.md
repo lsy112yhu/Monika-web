@@ -28,7 +28,7 @@
 
 头像可选，文件选择器接受 PNG / JPG / WebP / GIF，客户端限制 3MB；服务端应验证实际格式和数据。无后端时申请暂存 localStorage，仅对当前浏览器可见，不会发布到其他访客的友链列表。
 
-原有服务的 `POST /api/friends` 会直接写入友链列表，没有独立的待审核状态接口。新版的本地待处理记录与云端审核队列不是同一个功能；若需要统一的先审后发流程，需扩展后端契约。
+原有服务的 `POST /api/friends` 会直接写入友链列表，没有独立的待审核状态接口。因此前端明确区分两种状态：后端不可用时显示「本地暂存（仅本机可见，未提交）」，后端接受成功后显示「已发布」。统一的云端先审后发仍需要扩展后端契约。
 
 ## 音乐
 
@@ -50,7 +50,7 @@
 
 请求失败或没有已发布曲目时，前端使用内置的三段演示音频。播放列表选择、音量和当前曲目保存在 localStorage；通过文件选择器导入的音频使用当前会话的 Blob URL。
 
-原有后端另有 `/api/music/session`、`/api/music/admin`、`/api/music/admin/credentials`、`/api/music/admin/catalog`、`/api/music/admin/sync`、`/api/music/admin/published`。它们保留在 `server/music/server.js` 中；新版前端当前只消费已发布的歌单，不调用这些音乐管理接口。
+原有后端另有 `/api/music/session`、`/api/music/admin`、`/api/music/admin/credentials`、`/api/music/admin/catalog`、`/api/music/admin/sync`、`/api/music/admin/published`。管理台会在音乐服务可用时调用这些接口，提供凭据连接、歌单刷新、曲目同步和发布选中曲目的操作；服务不可用时隐藏音乐管理模块。
 
 ## 配置
 

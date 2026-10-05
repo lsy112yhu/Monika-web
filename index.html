@@ -13,7 +13,9 @@
       try {
         var saved = localStorage.getItem('monika-desk-theme');
         var preferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        document.documentElement.dataset.theme = saved === 'dark' || saved === 'light' ? saved : preferred;
+        var hour = new Date().getHours();
+        var timed = hour >= 7 && hour < 19 ? 'light' : 'dark';
+        document.documentElement.dataset.theme = saved === 'dark' || saved === 'light' ? saved : saved === 'time' ? timed : preferred;
       } catch (error) { document.documentElement.dataset.theme = 'light'; }
     }());
   </script>
@@ -37,7 +39,7 @@
       <div class="top-meta">
         <span class="time-readout" id="timeReadout">00:00</span>
         <span class="signal" aria-label="本地模式可用"><i></i> local / ready</span>
-        <button class="theme-toggle" id="themeToggle" type="button" aria-label="切换到暗色模式" aria-pressed="false" title="切换主题"><span id="themeIcon">☾</span><span id="themeLabel">dark</span></button>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="当前为系统模式，点击循环切换主题" aria-pressed="false" title="点击循环：浅色 / 暗色 / 跟随时间"><span id="themeIcon">◌</span><span id="themeLabel">system</span></button>
       </div>
     </header>
 
@@ -64,7 +66,7 @@
             <div class="portrait-note">desk mascot<br><b>tap me</b></div>
             <button class="portrait-button" id="mascotButton" type="button" aria-label="和 Monika 打招呼">
               <span class="portrait-ring"></span>
-              <img src="./assets/monika-profile-portrait.webp" alt="莫妮卡半身插画，托腮微笑">
+              <img id="mascotImage" src="./assets/monika-chibi-blink.webp" data-static-src="./assets/monika-chibi.png" alt="莫妮卡半身插画，托腮微笑">
               <span class="mascot-bubble" id="mascotBubble">你来啦。</span>
             </button>
           </div>
@@ -207,6 +209,7 @@
     <form class="modal-card" id="friendForm">
       <div class="modal-top"><div><span class="modal-kicker">FRIEND REQUEST</span><h2 id="friendDialogTitle">申请一张桌边座位</h2></div><button type="button" class="modal-close" data-close="friendDialog" aria-label="关闭">×</button></div>
       <p class="modal-help">填写后会先进行本地校验；连接后端时会提交到 <code>/api/friends</code>。</p>
+      <p class="submission-status" id="friendSubmissionStatus" role="status" aria-live="polite" hidden></p>
       <input type="hidden" id="friendEditId" value="">
       <label>昵称 <input id="friendName" name="name" maxlength="18" required placeholder="不超过 18 个字"></label>
       <label>一句简介 <input id="friendIntro" name="intro" maxlength="10" required placeholder="不超过 10 个字"></label>
