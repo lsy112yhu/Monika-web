@@ -319,53 +319,5 @@
     if (event.key === WHISPER_KEY) renderWhispers();
   });
 
-  // Issue #9: honest, device-local visitor counter. sessionStorage prevents reload farming.
-  // Initialize it before the first whisper render so malformed whisper data can never hide it.
-  const VISIT_KEY = 'monika-desk-device-visits';
-  const VISIT_SESSION_KEY = 'monika-desk-visit-counted-this-session';
-  let visitCount = 0;
-  let visitIncremented = false;
-
-  try {
-    const stored = Math.max(0, Number.parseInt(localStorage.getItem(VISIT_KEY) || '0', 10) || 0);
-    if (!sessionStorage.getItem(VISIT_SESSION_KEY)) {
-      visitCount = stored + 1;
-      localStorage.setItem(VISIT_KEY, String(visitCount));
-      sessionStorage.setItem(VISIT_SESSION_KEY, '1');
-      visitIncremented = true;
-    } else {
-      visitCount = stored;
-    }
-  } catch (error) {
-    visitCount = 1;
-  }
-
-  const visitorWidget = document.createElement('div');
-  visitorWidget.className = 'visitor-counter';
-  visitorWidget.setAttribute('aria-label', `这台设备上的第 ${visitCount} 次到访`);
-
-  const visitorLabel = document.createElement('span');
-  visitorLabel.className = 'visitor-counter-label';
-  visitorLabel.textContent = '这台设备上的第';
-
-  const digitRack = document.createElement('span');
-  digitRack.className = 'visitor-counter-digits';
-  String(Math.max(1, visitCount)).padStart(4, '0').split('').forEach((digit, index) => {
-    const flap = document.createElement('span');
-    flap.className = 'visitor-counter-flap';
-    if (visitIncremented) flap.classList.add('is-new');
-    flap.style.setProperty('--flip-delay', `${index * 45}ms`);
-    flap.textContent = digit;
-    digitRack.appendChild(flap);
-  });
-
-  const visitorSuffix = document.createElement('span');
-  visitorSuffix.className = 'visitor-counter-suffix';
-  visitorSuffix.textContent = '次到访';
-  visitorWidget.append(visitorLabel, digitRack, visitorSuffix);
-
-  const footer = document.querySelector('.footer');
-  if (footer) footer.prepend(visitorWidget);
-
   renderWhispers();
 })();

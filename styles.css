@@ -72,7 +72,7 @@ h3 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 23px;
 .portrait-ring { position: absolute; z-index: 1; width: 210px; height: 210px; top: 30px; right: 6px; background: var(--coral); opacity: .45; border-radius: 44% 56% 59% 41% / 39% 37% 63% 61%; transform: rotate(24deg); }
 .portrait-note { position: absolute; z-index: 3; right: -2px; top: 16px; color: #7b9287; font-size: 10px; letter-spacing: .1em; line-height: 1.5; transform: rotate(6deg); }
 .portrait-note b { color: var(--ink); letter-spacing: .04em; }
-.mascot-bubble { position: absolute; z-index: 4; left: -10px; bottom: 34px; padding: 9px 11px; background: #fffdf6; border: 1px solid rgba(29,42,39,.1); border-radius: 13px 13px 13px 2px; color: #63776e; font-size: 11px; white-space: nowrap; box-shadow: 4px 6px 0 rgba(29,42,39,.06); }
+.mascot-bubble { position: absolute; z-index: 4; left: -10px; bottom: 34px; max-width: 100%; padding: 9px 11px; background: #fffdf6; border: 1px solid rgba(29,42,39,.1); border-radius: 13px 13px 13px 2px; color: #63776e; font-size: 11px; line-height: 1.5; text-align: left; white-space: normal; overflow-wrap: anywhere; box-shadow: 4px 6px 0 rgba(29,42,39,.06); }
 .mascot-bubble::after { content: ""; position: absolute; bottom: -5px; left: 12px; width: 9px; height: 9px; background: #fffdf6; border-right: 1px solid rgba(29,42,39,.1); border-bottom: 1px solid rgba(29,42,39,.1); transform: rotate(45deg); }
 .intro-foot { display: flex; align-items: center; gap: 12px; color: #91a29a; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
 .intro-foot b { color: #597168; }

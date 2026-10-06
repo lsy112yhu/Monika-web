@@ -9,7 +9,9 @@
     localRequests: 'monika-desk-friend-requests',
     lastFriendSubmission: 'monika-desk-last-friend-submission',
     admin: 'monika-desk-admin',
-    theme: 'monika-desk-theme'
+    theme: 'monika-desk-theme',
+    deviceVisits: 'monika-desk-device-visits',
+    visitSession: 'monika-desk-visit-counted-this-session'
   };
 
   var THEME_MODES = ['system', 'light', 'dark', 'time'];
@@ -97,6 +99,7 @@
     themeMode: readThemeMode(),
     currentLyric: -1,
     localTracks: [],
+    deviceVisitCount: recordDeviceVisit(),
     mascotRecentMessages: [],
     mascotClickCount: 0,
     mascotLastClickAt: 0,
@@ -116,6 +119,16 @@
   }
   function saveJSON(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (error) {}
+  }
+  function recordDeviceVisit() {
+    try {
+      var stored = Math.max(0, Number.parseInt(localStorage.getItem(STORAGE.deviceVisits) || '0', 10) || 0);
+      if (sessionStorage.getItem(STORAGE.visitSession)) return Math.max(1, stored);
+      var count = stored + 1;
+      localStorage.setItem(STORAGE.deviceVisits, String(count));
+      sessionStorage.setItem(STORAGE.visitSession, '1');
+      return count;
+    } catch (error) { return null; }
   }
   function readThemeMode() {
     try {
@@ -748,11 +761,13 @@
   }
 
   function nextMascotMessage() {
-    var available = MASCOT_MESSAGES.filter(function (message) { return state.mascotRecentMessages.indexOf(message) === -1; });
-    var pool = available.length ? available : MASCOT_MESSAGES.slice();
+    var messages = MASCOT_MESSAGES.slice();
+    if (state.deviceVisitCount !== null) messages.push('这是你在这台设备上的第 ' + state.deviceVisitCount + ' 次到访呀♪');
+    var available = messages.filter(function (message) { return state.mascotRecentMessages.indexOf(message) === -1; });
+    var pool = available.length ? available : messages;
     var message = pool[Math.floor(Math.random() * pool.length)];
     state.mascotRecentMessages.push(message);
-    if (state.mascotRecentMessages.length > Math.max(1, MASCOT_MESSAGES.length - 1)) state.mascotRecentMessages.shift();
+    if (state.mascotRecentMessages.length > Math.max(1, messages.length - 1)) state.mascotRecentMessages.shift();
     return message;
   }
 
