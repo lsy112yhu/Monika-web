@@ -201,9 +201,14 @@
     friendsSection.insertAdjacentElement('afterend', board);
   }
 
+  const whisperDate = (timestamp) => {
+    const parsed = new Date(timestamp);
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  };
+
   const formatWhisperDate = (timestamp) => {
     try {
-      return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit' }).format(new Date(timestamp));
+      return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit' }).format(whisperDate(timestamp));
     } catch (error) {
       return '';
     }
@@ -231,9 +236,10 @@
       meta.className = 'whisper-note-meta';
       const author = document.createElement('strong');
       author.textContent = String(item.nickname || 'anonymous').slice(0, 18);
+      const dateValue = whisperDate(item.createdAt || Date.now());
       const date = document.createElement('time');
-      date.dateTime = new Date(item.createdAt || Date.now()).toISOString();
-      date.textContent = formatWhisperDate(item.createdAt || Date.now());
+      date.dateTime = dateValue.toISOString();
+      date.textContent = formatWhisperDate(dateValue);
       meta.append(author, date);
 
       const text = document.createElement('p');
