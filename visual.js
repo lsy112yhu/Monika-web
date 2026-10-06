@@ -102,13 +102,24 @@
 
   // Issue #8: a small local whisper board beside the friend space.
   const WHISPER_KEY = 'monika-desk-whispers';
-  const ADMIN_KEY = 'monika-desk-admin';
   const MAX_WHISPERS = 24;
+
+  const isValidWhisper = (item) =>
+    Boolean(item) &&
+    typeof item === 'object' &&
+    !Array.isArray(item) &&
+    typeof item.id === 'string' &&
+    item.id.length > 0 &&
+    typeof item.nickname === 'string' &&
+    item.nickname.trim().length > 0 &&
+    typeof item.message === 'string' &&
+    item.message.trim().length > 0;
 
   const readWhispers = () => {
     try {
       const value = JSON.parse(localStorage.getItem(WHISPER_KEY) || '[]');
-      return Array.isArray(value) ? value.slice(0, MAX_WHISPERS) : [];
+      if (!Array.isArray(value)) return [];
+      return value.filter(isValidWhisper).slice(0, MAX_WHISPERS);
     } catch (error) {
       return [];
     }
@@ -116,21 +127,19 @@
 
   const writeWhispers = (items) => {
     try {
-      localStorage.setItem(WHISPER_KEY, JSON.stringify(items.slice(0, MAX_WHISPERS)));
+      localStorage.setItem(
+        WHISPER_KEY,
+        JSON.stringify((Array.isArray(items) ? items : []).filter(isValidWhisper).slice(0, MAX_WHISPERS))
+      );
       return true;
     } catch (error) {
       return false;
     }
   };
 
-  const hasLocalAdminSession = () => {
-    try {
-      const value = JSON.parse(localStorage.getItem(ADMIN_KEY) || 'null');
-      return Boolean(value && value.user);
-    } catch (error) {
-      return false;
-    }
-  };
+  // The app only renders #adminLogout after its friend/music session check succeeds.
+  // This deliberately ignores localStorage so a stale cached username never grants permission.
+  const hasVerifiedAdminSession = () => Boolean(document.getElementById('adminLogout'));
 
   const board = document.createElement('section');
   board.className = 'whisper-board';
@@ -198,7 +207,9 @@
 
   const friendsSection = document.getElementById('friends');
   if (friendsSection && friendsSection.parentNode) {
-    friendsSection.insertAdjacentElement('afterend', board);
+    const notebookSection = friendsSection.parentNode.querySelector('.notebook-card');
+    if (notebookSection) notebookSection.insertAdjacentElement('afterend', board);
+    else friendsSection.insertAdjacentElement('afterend', board);
   }
 
   const whisperDate = (timestamp) => {
@@ -218,7 +229,7 @@
     if (!whisperList) return;
     whisperList.replaceChildren();
     const items = readWhispers();
-    const admin = hasLocalAdminSession();
+    const admin = hasVerifiedAdminSession();
 
     if (!items.length) {
       const empty = document.createElement('p');
@@ -235,7 +246,7 @@
       const meta = document.createElement('div');
       meta.className = 'whisper-note-meta';
       const author = document.createElement('strong');
-      author.textContent = String(item.nickname || 'anonymous').slice(0, 18);
+      author.textContent = item.nickname.slice(0, 18);
       const dateValue = whisperDate(item.createdAt || Date.now());
       const date = document.createElement('time');
       date.dateTime = dateValue.toISOString();
@@ -244,7 +255,7 @@
 
       const text = document.createElement('p');
       // textContent is intentional: visitor content is never interpreted as HTML.
-      text.textContent = String(item.message || '').slice(0, 80);
+      text.textContent = item.message.slice(0, 80);
 
       note.append(meta, text);
 
@@ -291,7 +302,7 @@
 
   whisperList.addEventListener('click', (event) => {
     const button = event.target.closest('[data-whisper-delete]');
-    if (!button || !hasLocalAdminSession()) return;
+    if (!button || !hasVerifiedAdminSession()) return;
     const id = button.dataset.whisperDelete;
     const nextItems = readWhispers().filter((item) => item.id !== id);
     if (writeWhispers(nextItems)) {
@@ -305,11 +316,11 @@
     new MutationObserver(renderWhispers).observe(adminContent, { childList: true, subtree: true });
   }
   window.addEventListener('storage', (event) => {
-    if (event.key === WHISPER_KEY || event.key === ADMIN_KEY) renderWhispers();
+    if (event.key === WHISPER_KEY) renderWhispers();
   });
-  renderWhispers();
 
   // Issue #9: honest, device-local visitor counter. sessionStorage prevents reload farming.
+  // Initialize it before the first whisper render so malformed whisper data can never hide it.
   const VISIT_KEY = 'monika-desk-device-visits';
   const VISIT_SESSION_KEY = 'monika-desk-visit-counted-this-session';
   let visitCount = 0;
@@ -355,4 +366,6 @@
 
   const footer = document.querySelector('.footer');
   if (footer) footer.prepend(visitorWidget);
+
+  renderWhispers();
 })();
