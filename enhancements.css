@@ -84,6 +84,17 @@
   transform: rotate(2deg);
 }
 
+.whisper-local-badge.is-shared {
+  color: #3f7254;
+  border-style: solid;
+  border-color: rgba(74,139,101,.22);
+  background: rgba(156,224,189,.24);
+}
+
+.whisper-local-badge.is-syncing {
+  opacity: .72;
+}
+
 .whisper-form {
   grid-column: 1;
   display: grid;
@@ -272,6 +283,12 @@
   color: #b5c9c0;
   border-color: rgba(218,247,229,.17);
   background: rgba(218,247,229,.07);
+}
+
+[data-theme="dark"] .whisper-local-badge.is-shared {
+  color: #c5edd0;
+  border-color: rgba(145,221,176,.28);
+  background: rgba(73,146,104,.22);
 }
 
 [data-theme="dark"] .whisper-form label {

@@ -100,9 +100,12 @@
   paintLamp();
   syncLampState();
 
-  // Issue #8: a small local whisper board beside the friend space.
+  // Issue #8: shared whisper board beside the friend space.
   const WHISPER_KEY = 'monika-desk-whispers';
+  const WHISPER_ENDPOINT = '/api/whispers';
   const MAX_WHISPERS = 24;
+  let whisperApiAvailable = null;
+  let whisperItems = [];
 
   const isValidWhisper = (item) =>
     Boolean(item) &&
@@ -115,30 +118,26 @@
     typeof item.message === 'string' &&
     item.message.trim().length > 0;
 
-  const readWhispers = () => {
+  const normalizeWhispers = (items) =>
+    (Array.isArray(items) ? items : []).filter(isValidWhisper).slice(0, MAX_WHISPERS);
+
+  const readLocalWhispers = () => {
     try {
-      const value = JSON.parse(localStorage.getItem(WHISPER_KEY) || '[]');
-      if (!Array.isArray(value)) return [];
-      return value.filter(isValidWhisper).slice(0, MAX_WHISPERS);
+      return normalizeWhispers(JSON.parse(localStorage.getItem(WHISPER_KEY) || '[]'));
     } catch (error) {
       return [];
     }
   };
 
-  const writeWhispers = (items) => {
+  const writeLocalWhispers = (items) => {
     try {
-      localStorage.setItem(
-        WHISPER_KEY,
-        JSON.stringify((Array.isArray(items) ? items : []).filter(isValidWhisper).slice(0, MAX_WHISPERS))
-      );
+      localStorage.setItem(WHISPER_KEY, JSON.stringify(normalizeWhispers(items)));
       return true;
     } catch (error) {
       return false;
     }
   };
 
-  // The app only renders #adminLogout after its friend/music session check succeeds.
-  // This deliberately ignores localStorage so a stale cached username never grants permission.
   const hasVerifiedAdminSession = () => Boolean(document.getElementById('adminLogout'));
 
   const board = document.createElement('section');
@@ -156,12 +155,12 @@
   boardTitle.id = 'whisperTitle';
   boardTitle.textContent = '给桌边留一句悄悄话';
   const boardHint = document.createElement('p');
-  boardHint.textContent = '仅保存在这台设备上，不会上传到服务器。';
+  boardHint.textContent = '正在读取云端留言……';
   boardHeading.append(boardKicker, boardTitle, boardHint);
 
   const boardBadge = document.createElement('span');
-  boardBadge.className = 'whisper-local-badge';
-  boardBadge.textContent = 'local only';
+  boardBadge.className = 'whisper-local-badge is-syncing';
+  boardBadge.textContent = 'syncing';
   boardHead.append(boardHeading, boardBadge);
 
   const whisperForm = document.createElement('form');
@@ -212,6 +211,42 @@
     else friendsSection.insertAdjacentElement('afterend', board);
   }
 
+  const setWhisperConnectionState = (mode) => {
+    const shared = mode === 'shared';
+    const local = mode === 'local';
+    boardBadge.textContent = shared ? 'shared' : local ? 'local preview' : 'syncing';
+    boardBadge.classList.toggle('is-shared', shared);
+    boardBadge.classList.toggle('is-syncing', mode === 'syncing');
+    boardHint.textContent = shared
+      ? '留言会保存到云端，所有访客都能看到。'
+      : local
+        ? '当前未连接后端，留言只会保存在这台设备。'
+        : '正在读取云端留言……';
+  };
+
+  const requestWhispers = async (options = {}) => {
+    const response = await fetch(WHISPER_ENDPOINT, {
+      credentials: 'include',
+      ...options,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        ...(options.headers || {})
+      }
+    });
+    let data = {};
+    try {
+      data = await response.json();
+    } catch (error) {
+      data = {};
+    }
+    if (!response.ok) {
+      const failure = new Error(data.message || data.error || ('HTTP ' + response.status));
+      failure.status = response.status;
+      throw failure;
+    }
+    return data;
+  };
+
   const whisperDate = (timestamp) => {
     const parsed = new Date(timestamp);
     return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
@@ -228,20 +263,22 @@
   const renderWhispers = () => {
     if (!whisperList) return;
     whisperList.replaceChildren();
-    const items = readWhispers();
+    const items = normalizeWhispers(whisperItems);
     const admin = hasVerifiedAdminSession();
 
     if (!items.length) {
       const empty = document.createElement('p');
       empty.className = 'whisper-empty';
-      empty.textContent = '还没有纸条。第一句悄悄话可以从这里开始。';
+      empty.textContent = whisperApiAvailable === false
+        ? '后端暂时不可用；连接后，第一句云端留言可以从这里开始。'
+        : '还没有纸条。第一句悄悄话可以从这里开始。';
       whisperList.appendChild(empty);
       return;
     }
 
     items.forEach((item, index) => {
       const note = document.createElement('article');
-      note.className = `whisper-note whisper-note-${(index % 3) + 1}`;
+      note.className = 'whisper-note whisper-note-' + ((index % 3) + 1);
 
       const meta = document.createElement('div');
       meta.className = 'whisper-note-meta';
@@ -254,9 +291,7 @@
       meta.append(author, date);
 
       const text = document.createElement('p');
-      // textContent is intentional: visitor content is never interpreted as HTML.
       text.textContent = item.message.slice(0, 80);
-
       note.append(meta, text);
 
       if (admin) {
@@ -264,7 +299,7 @@
         remove.type = 'button';
         remove.className = 'whisper-delete';
         remove.dataset.whisperDelete = item.id;
-        remove.setAttribute('aria-label', `删除 ${author.textContent} 的留言`);
+        remove.setAttribute('aria-label', '删除 ' + author.textContent + ' 的留言');
         remove.textContent = '×';
         note.appendChild(remove);
       }
@@ -273,7 +308,26 @@
     });
   };
 
-  whisperForm.addEventListener('submit', (event) => {
+  const refreshWhispers = async ({ silent = false } = {}) => {
+    setWhisperConnectionState('syncing');
+    try {
+      const data = await requestWhispers();
+      whisperItems = normalizeWhispers(data.whispers);
+      whisperApiAvailable = true;
+      setWhisperConnectionState('shared');
+      renderWhispers();
+      return true;
+    } catch (error) {
+      whisperApiAvailable = false;
+      whisperItems = readLocalWhispers();
+      setWhisperConnectionState('local');
+      renderWhispers();
+      if (!silent) whisperStatus.textContent = '当前使用本地预览，留言不会同步给其他访客。';
+      return false;
+    }
+  };
+
+  whisperForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const nickname = nicknameInput.value.trim();
     const message = messageInput.value.trim();
@@ -282,30 +336,91 @@
       return;
     }
 
-    const items = readWhispers();
-    items.unshift({
-      id: `whisper-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    const payload = {
       nickname: nickname.slice(0, 18),
-      message: message.slice(0, 80),
-      createdAt: Date.now()
-    });
+      message: message.slice(0, 80)
+    };
+    submitWhisper.disabled = true;
+    whisperStatus.textContent = '正在贴到留言板……';
 
-    if (!writeWhispers(items)) {
-      whisperStatus.textContent = '这台设备暂时无法保存纸条。';
-      return;
+    try {
+      const data = await requestWhispers({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      whisperItems = normalizeWhispers(data.whispers || (data.whisper ? [data.whisper, ...whisperItems] : whisperItems));
+      whisperApiAvailable = true;
+      setWhisperConnectionState('shared');
+      whisperForm.reset();
+      whisperStatus.textContent = '纸条已贴好，所有访客都能看到。';
+      renderWhispers();
+    } catch (error) {
+      if (error.status && error.status >= 400 && error.status < 500 && error.status !== 404) {
+        whisperApiAvailable = true;
+        setWhisperConnectionState('shared');
+        whisperStatus.textContent = error.message || '留言没有提交成功，请稍后再试。';
+      } else {
+        const localItem = {
+          id: 'whisper-' + Date.now() + '-' + Math.random().toString(16).slice(2, 8),
+          nickname: payload.nickname,
+          message: payload.message,
+          createdAt: Date.now()
+        };
+        const localItems = [localItem, ...readLocalWhispers()];
+        whisperApiAvailable = false;
+        whisperItems = localItems;
+        setWhisperConnectionState('local');
+        whisperStatus.textContent = writeLocalWhispers(localItems)
+          ? '后端暂时不可用，纸条只保存在这台设备。'
+          : '这台设备暂时无法保存纸条。';
+        renderWhispers();
+      }
+    } finally {
+      submitWhisper.disabled = false;
     }
-
-    whisperForm.reset();
-    whisperStatus.textContent = '纸条贴好了，只在这台设备上可见。';
-    renderWhispers();
   });
 
-  whisperList.addEventListener('click', (event) => {
+  whisperList.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-whisper-delete]');
     if (!button || !hasVerifiedAdminSession()) return;
     const id = button.dataset.whisperDelete;
-    const nextItems = readWhispers().filter((item) => item.id !== id);
-    if (writeWhispers(nextItems)) {
+
+    if (whisperApiAvailable) {
+      try {
+        const response = await fetch(WHISPER_ENDPOINT + '/' + encodeURIComponent(id), {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        let data = {};
+        try {
+          data = await response.json();
+        } catch (error) {
+          data = {};
+        }
+        if (!response.ok) {
+          const failure = new Error(data.message || data.error || ('HTTP ' + response.status));
+          failure.status = response.status;
+          throw failure;
+        }
+        whisperItems = normalizeWhispers(data.whispers);
+        whisperStatus.textContent = '云端留言已移除。';
+        renderWhispers();
+        return;
+      } catch (error) {
+        if (error.status && error.status !== 404 && error.status !== 405) {
+          whisperStatus.textContent = error.message || '留言删除失败。';
+          return;
+        }
+        whisperApiAvailable = false;
+        setWhisperConnectionState('local');
+      }
+    }
+
+    const nextItems = readLocalWhispers().filter((item) => item.id !== id);
+    if (writeLocalWhispers(nextItems)) {
+      whisperItems = nextItems;
       whisperStatus.textContent = '这张本地纸条已移除。';
       renderWhispers();
     }
@@ -316,8 +431,16 @@
     new MutationObserver(renderWhispers).observe(adminContent, { childList: true, subtree: true });
   }
   window.addEventListener('storage', (event) => {
-    if (event.key === WHISPER_KEY) renderWhispers();
+    if (event.key === WHISPER_KEY && whisperApiAvailable !== true) {
+      whisperItems = readLocalWhispers();
+      renderWhispers();
+    }
   });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshWhispers({ silent: true });
+  });
+  window.setInterval(() => refreshWhispers({ silent: true }), 60_000);
 
   renderWhispers();
+  refreshWhispers({ silent: true });
 })();

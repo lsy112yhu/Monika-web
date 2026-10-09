@@ -23,7 +23,8 @@ python3 -m http.server 4173
 - 吉祥物使用睁眼 3 秒、闭眼 150 毫秒的眨眼资源；点击会显示不重复的短台词，快速三连击会触发持续 2 秒的 “Can you hear me?” 彩蛋。开启 `prefers-reduced-motion` 时使用静态图。
 - 播放、暂停、上一首、下一首、进度、音量和示例歌词展示。
 - 内置三段约 8 秒的演示音乐；播放选择、当前曲目与音量使用 localStorage 保存。导入的本地音频仅在当前页面会话中可用，刷新后需重新选择文件。
-- 友链卡片、申请表单；静态部署时申请会明确标记为「本地暂存（仅本机可见，未提交）」；连接后端后直接写入 `/api/friends`，成功后标记为「已发布」。
+- 友链卡片、申请表单；静态部署时申请会明确标记为「本地暂存（仅本机可见，未提交）」；连接后端后直接写入 `/api/friends`，成功后标记为「已发布」，所有访客都能看到。
+- 留言板默认读取和提交 `/api/whispers`；连接后端时留言会写入共享数据文件并对所有访客可见，后端不可用时明确显示 `local preview` 并降级到本机暂存。
 - 管理入口使用 `/api/friends/session` 查询和登录；连接后端后可编辑、删除友链，并在本地预览模式处理本机暂存申请。没有后端时不能登录管理员。
 - 管理台检测到音乐服务时，会显示 QQ 音乐凭据、歌单刷新、曲目同步和已发布曲目管理；音乐服务不可用时该模块隐藏。
 - 自动读取后端已发布歌单；站点探针成功返回后显示状态模块，无后端时隐藏。
@@ -41,7 +42,7 @@ Steam、小黑盒、邮件等个人入口和演示友链是占位内容，可在
 
 后端保持原仓库实现，启动和 systemd 示例见 [`server/README.md`](server/README.md)。配置项以 `server/friends/.env.example` 和 `server/music/.env.example` 为准。
 
-前端请求同源的 `/api/*`，写操作携带 `X-Requested-With: XMLHttpRequest` 和会话 Cookie。生产环境通过反向代理接入只监听本机的服务。例如在已有 Nginx `server` 块中加入：
+前端请求同源的 `/api/*`，写操作携带 `X-Requested-With: XMLHttpRequest` 和会话 Cookie。生产环境通过反向代理接入只监听本机的服务，友链服务现在同时提供 `/api/friends` 与 `/api/whispers`。例如在已有 Nginx `server` 块中加入：
 
 ```nginx
 location = /api/friends {
@@ -50,6 +51,16 @@ location = /api/friends {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 }
 location /api/friends/ {
+    proxy_pass http://127.0.0.1:8766;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+location = /api/whispers {
+    proxy_pass http://127.0.0.1:8766;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+location /api/whispers/ {
     proxy_pass http://127.0.0.1:8766;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

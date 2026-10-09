@@ -28,10 +28,13 @@ DATA_FILE = Path(os.environ.get("FRIENDS_DATA_FILE", "/var/lib/web-lsy2005/frien
 MAX_BODY_BYTES = 5_500_000
 MAX_AVATAR_BYTES = 3 * 1024 * 1024
 MAX_LINKS = 120
+MAX_WHISPERS = 200
 LOGIN_RATE_LIMIT = 8
 LOGIN_RATE_WINDOW_SECONDS = 15 * 60
 SUBMISSION_RATE_LIMIT = 5
 SUBMISSION_RATE_WINDOW_SECONDS = 60 * 60
+WHISPER_RATE_LIMIT = 10
+WHISPER_RATE_WINDOW_SECONDS = 60 * 60
 ADMIN_USERNAME = os.environ.get("FRIENDS_ADMIN_USERNAME", "Monika")
 ADMIN_PASSWORD_HASH = os.environ.get("FRIENDS_ADMIN_PASSWORD_HASH", "")
 SESSION_SECRET = os.environ.get("FRIENDS_SESSION_SECRET", "")
@@ -48,7 +51,7 @@ SITE_STATUS_TIMEOUT_SECONDS = 6
 
 store_lock = threading.Lock()
 rate_limit_lock = threading.Lock()
-rate_limit_buckets = {"login": {}, "submission": {}}
+rate_limit_buckets = {"login": {}, "submission": {}, "whisper": {}}
 site_status_lock = threading.Lock()
 site_status_cache = {"expires": 0.0, "payload": None}
 
@@ -59,16 +62,20 @@ def utc_now():
 
 def read_store():
     if not DATA_FILE.exists():
-        return {"links": []}
+        return {"links": [], "whispers": []}
 
     try:
         with DATA_FILE.open("r", encoding="utf-8") as file:
             data = json.load(file)
     except (OSError, json.JSONDecodeError):
-        return {"links": []}
+        return {"links": [], "whispers": []}
 
     links = data.get("links", [])
-    return {"links": links if isinstance(links, list) else []}
+    whispers = data.get("whispers", [])
+    return {
+        "links": links if isinstance(links, list) else [],
+        "whispers": whispers if isinstance(whispers, list) else [],
+    }
 
 
 def write_store(data):
@@ -149,7 +156,7 @@ def is_secure_request(handler):
 def make_session_cookie(value, max_age=SESSION_TTL_SECONDS, handler=None):
     parts = [
         f"{SESSION_COOKIE_NAME}={value}",
-        "Path=/api/friends",
+        "Path=/api",
         "HttpOnly",
         "SameSite=Lax",
         f"Max-Age={max_age}",
@@ -273,6 +280,31 @@ def reject_rate_limited(handler, retry_after):
         {"error": "rate_limited", "message": "Too many requests. Please try again later."},
         [("Retry-After", str(retry_after))],
     )
+
+
+def whisper_id_from_path(path):
+    prefix = "/api/whispers/"
+    if not path.startswith(prefix):
+        return ""
+    whisper_id = unquote(path[len(prefix):]).strip()
+    return whisper_id if whisper_id and "/" not in whisper_id else ""
+
+
+def sanitize_whisper(payload):
+    nickname = str(payload.get("nickname", "")).strip()[:18]
+    message = str(payload.get("message", "")).strip()[:80]
+
+    if not nickname:
+        raise ValueError("昵称不能为空")
+    if not message:
+        raise ValueError("留言不能为空")
+
+    return {
+        "id": str(payload.get("id") or uuid.uuid4()),
+        "nickname": nickname,
+        "message": message,
+        "createdAt": str(payload.get("createdAt") or utc_now()),
+    }
 
 
 def probe_project_site(site):
@@ -438,7 +470,7 @@ class FriendsHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_HEAD(self):
-        if self.path.split("?", 1)[0] not in {"/api/friends", "/api/friends/session", "/api/friends/sites"}:
+        if self.path.split("?", 1)[0] not in {"/api/friends", "/api/friends/session", "/api/friends/sites", "/api/whispers"}:
             headers_response(self, HTTPStatus.NOT_FOUND)
             return
         headers_response(self, HTTPStatus.OK)
@@ -458,13 +490,19 @@ class FriendsHandler(BaseHTTPRequestHandler):
             json_response(self, HTTPStatus.OK, project_site_status())
             return
 
+        if path == "/api/whispers":
+            with store_lock:
+                data = read_store()
+            json_response(self, HTTPStatus.OK, {"whispers": data["whispers"]})
+            return
+
         if path != "/api/friends":
             json_response(self, HTTPStatus.NOT_FOUND, {"error": "not_found"})
             return
 
         with store_lock:
             data = read_store()
-        json_response(self, HTTPStatus.OK, data)
+        json_response(self, HTTPStatus.OK, {"links": data["links"]})
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
@@ -473,6 +511,9 @@ class FriendsHandler(BaseHTTPRequestHandler):
             return
 
         if path != "/api/friends":
+            if path == "/api/whispers":
+                self.handle_whisper_submission()
+                return
             json_response(self, HTTPStatus.NOT_FOUND, {"error": "not_found"})
             return
 
@@ -522,10 +563,53 @@ class FriendsHandler(BaseHTTPRequestHandler):
                 return
 
             links.append(link)
-            data = {"links": links, "updatedAt": utc_now()}
+            data = {"links": links, "whispers": data["whispers"], "updatedAt": utc_now()}
             write_store(data)
 
         json_response(self, HTTPStatus.CREATED, {"link": link, "links": links})
+
+    def handle_whisper_submission(self):
+        if not mutating_request_allowed(self):
+            json_response(self, HTTPStatus.FORBIDDEN, {"error": "bad_origin"})
+            return
+
+        retry_after = consume_rate_limit(
+            "whisper",
+            self,
+            WHISPER_RATE_LIMIT,
+            WHISPER_RATE_WINDOW_SECONDS,
+        )
+        if retry_after:
+            reject_rate_limited(self, retry_after)
+            return
+
+        try:
+            payload = read_json_body(self)
+        except ValueError as exc:
+            if str(exc) == "missing_length":
+                json_response(self, HTTPStatus.LENGTH_REQUIRED, {"error": "missing_length"})
+            elif str(exc) == "body_too_large":
+                json_response(self, HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "body_too_large", "message": "留言内容太大了。"})
+            elif str(exc) == "invalid_json":
+                json_response(self, HTTPStatus.BAD_REQUEST, {"error": "invalid_json", "message": "提交内容格式不对。"})
+            else:
+                json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+
+        try:
+            whisper = sanitize_whisper(payload if isinstance(payload, dict) else {})
+        except ValueError as exc:
+            json_response(self, HTTPStatus.BAD_REQUEST, {"error": "invalid_whisper", "message": str(exc)})
+            return
+
+        with store_lock:
+            data = read_store()
+            whispers = [item for item in data["whispers"] if isinstance(item, dict)]
+            whispers.insert(0, whisper)
+            data = {"links": data["links"], "whispers": whispers[:MAX_WHISPERS]}
+            write_store(data)
+
+        json_response(self, HTTPStatus.CREATED, {"whisper": whisper, "whispers": data["whispers"]})
 
     def do_PUT(self):
         path = self.path.split("?", 1)[0]
@@ -579,7 +663,7 @@ class FriendsHandler(BaseHTTPRequestHandler):
             link["createdAt"] = str(previous.get("createdAt") or link.get("createdAt") or utc_now())
             link["updatedAt"] = utc_now()
             links[index] = link
-            data = {"links": links, "updatedAt": utc_now()}
+            data = {"links": links, "whispers": data["whispers"], "updatedAt": utc_now()}
             write_store(data)
 
         json_response(self, HTTPStatus.OK, {"link": link, "links": links})
@@ -591,6 +675,30 @@ class FriendsHandler(BaseHTTPRequestHandler):
                 json_response(self, HTTPStatus.FORBIDDEN, {"error": "bad_origin"})
                 return
             json_response(self, HTTPStatus.OK, {"authenticated": False}, [("Set-Cookie", clear_session_cookie(self))])
+            return
+
+        whisper_id = whisper_id_from_path(path)
+        if whisper_id:
+            if not mutating_request_allowed(self, require_json=False):
+                json_response(self, HTTPStatus.FORBIDDEN, {"error": "bad_origin"})
+                return
+            if not require_admin(self):
+                return
+
+            with store_lock:
+                data = read_store()
+                whispers = data["whispers"]
+                kept_whispers = [
+                    item for item in whispers
+                    if not (isinstance(item, dict) and str(item.get("id")) == whisper_id)
+                ]
+                if len(kept_whispers) == len(whispers):
+                    json_response(self, HTTPStatus.NOT_FOUND, {"error": "not_found", "message": "没有找到这条留言。"})
+                    return
+                data = {"links": data["links"], "whispers": kept_whispers}
+                write_store(data)
+
+            json_response(self, HTTPStatus.OK, {"whispers": kept_whispers})
             return
 
         friend_id = friend_id_from_path(path)
@@ -611,7 +719,7 @@ class FriendsHandler(BaseHTTPRequestHandler):
             if len(kept_links) == len(links):
                 json_response(self, HTTPStatus.NOT_FOUND, {"error": "not_found", "message": "没有找到这条友链。"})
                 return
-            data = {"links": kept_links, "updatedAt": utc_now()}
+            data = {"links": kept_links, "whispers": data["whispers"], "updatedAt": utc_now()}
             write_store(data)
 
         json_response(self, HTTPStatus.OK, {"links": kept_links})
